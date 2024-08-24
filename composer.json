@@ -1,0 +1,13 @@
+{
+    "name": "vladchornyi/mono",
+    "description": "acquiring ьщmono",
+    "type": "library",
+    "license": "GNU",
+    "autoload": {
+        "psr-4": {
+            "Vladchornyi\\Mono\\": "src/"
+        }
+    },
+    "minimum-stability": "dev",
+    "require": {}
+}
