@@ -10,9 +10,10 @@ abstract class AbstractService
     /**
      * @param string $apiKey
      */
-    public function __construct(string $apiKey)
+    public function __construct(string $apiKey, string $baseUrl)
     {
         $this->apiKey = $apiKey;
+        $this->baseUrl = $baseUrl;
     }
 
     /**

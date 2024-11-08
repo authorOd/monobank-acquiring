@@ -4,8 +4,6 @@ namespace Vladchornyi\Mono\Services;
 
 class StatementService extends AbstractService
 {
-    protected $baseUrl = 'https://api.monobank.ua/api/merchant/statement';
-
     /**
      * @param int $from
      * @param int $to

@@ -1,6 +1,7 @@
 {
     "name": "vladchornyi/mono",
-    "description": "acquiring ьщmono",
+    "version": "1.0.0",
+    "description": "acquiring mono",
     "type": "library",
     "license": "GNU",
     "autoload": {

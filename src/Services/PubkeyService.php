@@ -2,17 +2,15 @@
 
 namespace Vladchornyi\Mono\Services;
 
-class StatementService extends AbstractService
+class PubkeyService extends AbstractService
 {
-    protected $baseUrl = 'https://api.monobank.ua/api/merchant/statement';
-
     /**
      * @param int $from
      * @param int $to
      * @return mixed
      */
-    public function getStatement(int $from, int $to)
+    public function get()
     {
-        return $this->sendRequest('GET', "?&from=$from&to=$to");
+        return $this->sendRequest('GET', '');
     }
 }

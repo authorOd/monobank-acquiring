@@ -6,8 +6,6 @@ use Vladchornyi\Mono\Models\InvoiceData;
 
 class InvoiceService extends AbstractService
 {
-    protected $baseUrl = 'https://api.monobank.ua/api/merchant/invoice';
-
     /**
      * @param array $data
      * @return mixed
