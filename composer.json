@@ -1,9 +1,9 @@
 {
     "name": "vladchornyi/mono",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "acquiring mono",
     "type": "library",
-    "license": "GNU",
+    "license": "proprietary",
     "autoload": {
         "psr-4": {
             "Vladchornyi\\Mono\\": "src/"
