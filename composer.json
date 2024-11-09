@@ -1,6 +1,5 @@
 {
     "name": "vladchornyi/mono",
-    "version": "1.0.1",
     "description": "acquiring mono",
     "type": "library",
     "license": "proprietary",
