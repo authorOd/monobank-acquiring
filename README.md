@@ -46,8 +46,49 @@ try {
 $redirectUrl = 'https://test.com?payment=success';
 $webHookUrl = 'https://test.com/mono/callback';
 $params = ['saveCard' => true];
+$discountValue = 10.00;
+$sum = 59000; // 590 грн у копійках
+$amount = 58000;
 
-$invoiceData = new InvoiceData(150, $redirectUrl, $webHookUrl, $params);
+$globalDiscount = new DiscountItem(
+    type: 'DISCOUNT',
+    mode: 'VALUE',
+    value: $discountValue
+);
+
+// Товар у кошику
+$basketItem = new BasketOrderItem(
+    name: 'Товар 1',
+    qty: 1,
+    sum: $sum,                
+    code: 'SV-SUB-001',        // код товару (required)
+    icon: null,
+    unit: null,
+    barcode: null,
+    header: null,
+    footer: null,
+    tax: null,
+    uktzed: '4901990000',      // опційно
+    discounts: []              // локальні знижки на позицію (якщо треба)
+);
+
+// Дані для фіскалізації
+$merchantPaymInfo = new MerchantPaymInfoItem(
+    reference: 'ORDER-12345',
+    destination: 'Оплата товарів',
+    comment: 'Товари',
+    customerEmails: ['author.od@gmail.com'],
+    discounts: [$globalDiscount], // знижка на весь чек
+    basketOrder: [$basketItem]
+);
+
+$invoiceData = new InvoiceData(
+    amount: $amount,
+    redirectUrl: 'https://svitylo.com?ret=123',
+    webHookUrl: 'https://svitylo.com/mono/callback',
+    saveCardData: ['saveCard' => true],
+    merchantPaymInfo: $merchantPaymInfo
+);
 
 try {
     $invoice = $monoClient->invoices()->createInvoice($invoiceData);

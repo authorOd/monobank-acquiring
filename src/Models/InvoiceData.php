@@ -10,6 +10,7 @@ class InvoiceData
     protected ?string $redirectUrl; // Адреса для повернення після оплати
     protected ?string $webHookUrl; // Адреса для CallBack
     protected ?array $saveCardData; // Дані для збереження (токенізації) картки
+	protected ?MerchantPaymInfoItem $merchantPaymInfo;
 
     /**
      * @param int $amount
@@ -21,12 +22,14 @@ class InvoiceData
         int $amount,
         ?string $redirectUrl = null,
         ?string $webHookUrl = null,
-        ?array $saveCardData = null
+        ?array $saveCardData = null,
+		?MerchantPaymInfoItem $merchantPaymInfo = null
     ) {
         $this->amount = $amount;
         $this->redirectUrl = $redirectUrl;
         $this->webHookUrl = $webHookUrl;
         $this->saveCardData = $saveCardData;
+		$this->merchantPaymInfo = $merchantPaymInfo;
 
         $this->validate();
     }
@@ -55,6 +58,7 @@ class InvoiceData
             'redirectUrl' => $this->redirectUrl,
             'webHookUrl' => $this->webHookUrl,
             'saveCardData' => $this->saveCardData,
+			'merchantPaymInfo' => $this->merchantPaymInfo?->toArray(),
         ];
     }
 }
