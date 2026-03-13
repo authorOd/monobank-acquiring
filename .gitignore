@@ -1,1 +1,5 @@
 /vendor/
+.idea/
+.env
+test.php
+*.log

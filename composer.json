@@ -1,6 +1,5 @@
 {
     "name": "vladchornyi/mono",
-    "version": "1.2.0",
     "description": "acquiring mono",
     "type": "library",
     "license": "proprietary",
@@ -10,5 +9,9 @@
         }
     },
     "minimum-stability": "dev",
-    "require": {}
+    "require": {
+        "php": "^8.0",
+        "ext-curl": "*",
+        "ext-json": "*"
+    }
 }

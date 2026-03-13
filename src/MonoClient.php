@@ -5,6 +5,7 @@ namespace Vladchornyi\Mono;
 use Vladchornyi\Mono\Services\InvoiceService;
 use Vladchornyi\Mono\Services\PubkeyService;
 use Vladchornyi\Mono\Services\StatementService;
+use Vladchornyi\Mono\Services\SubscriptionService;
 
 class MonoClient
 {
@@ -30,5 +31,10 @@ class MonoClient
     public function pubkey(): PubkeyService
     {
         return new PubkeyService($this->apiKey, $this->baseUrl . '/pubkey');
+    }
+
+    public function subscriptions(): SubscriptionService
+    {
+        return new SubscriptionService($this->apiKey, $this->baseUrl . '/subscription');
     }
 }

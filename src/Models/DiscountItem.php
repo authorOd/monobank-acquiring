@@ -2,7 +2,7 @@
 
 namespace Vladchornyi\Mono\Models;
 
-use http\Exception\InvalidArgumentException;
+use InvalidArgumentException;
 
 class DiscountItem
 {
