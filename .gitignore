@@ -3,3 +3,4 @@
 .env
 test.php
 *.log
+composer.lock
