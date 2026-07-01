@@ -2,77 +2,113 @@
 
 namespace Vladchornyi\Mono\Services;
 
+use Vladchornyi\Mono\Contracts\HttpClientInterface;
+use Vladchornyi\Mono\Exceptions\MonoApiException;
+use Vladchornyi\Mono\Exceptions\MonoJsonException;
+use Vladchornyi\Mono\Http\CurlHttpClient;
+
 abstract class AbstractService
 {
-    protected $apiKey;
-    protected $baseUrl;
+    protected string $apiKey;
+    protected string $baseUrl;
+    protected HttpClientInterface $httpClient;
 
     /**
      * @param string $apiKey
+     * @param array<string, mixed> $httpOptions
      */
-    public function __construct(string $apiKey, string $baseUrl)
+    public function __construct(
+        string $apiKey,
+        string $baseUrl,
+        ?HttpClientInterface $httpClient = null,
+        array $httpOptions = []
+    )
     {
         $this->apiKey = $apiKey;
-        $this->baseUrl = $baseUrl;
+        $this->baseUrl = rtrim($baseUrl, '/');
+        $this->httpClient = $httpClient ?? new CurlHttpClient($httpOptions);
     }
 
     /**
      * @param string $method
      * @param string $endpoint
-     * @param array $data
-     * @return mixed
-     * @throws \Exception
+     * @param array<string, mixed>|null $data
+     * @param array<string, mixed> $query
+     * @return array<string, mixed>
      */
-    protected function sendRequest(string $method, string $endpoint, array $data = [])
+    protected function sendRequest(string $method, string $endpoint = '', ?array $data = null, array $query = []): array
     {
-        $url = $this->baseUrl . $endpoint;
-        $ch = curl_init($url);
+        $url = $this->buildUrl($endpoint, $query);
+        $method = strtoupper($method);
+        $payload = $data === null
+            ? null
+            : array_filter($data, static fn($value) => $value !== null);
 
-        if ($ch === false) {
-            throw new \Exception('Failed to initialize cURL');
-        }
-
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'X-Token: ' . $this->apiKey,
+        $response = $this->httpClient->send($method, $url, [
+            'X-Token' => $this->apiKey,
             'Content-Type: application/json',
-        ]);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+        ], $payload);
 
-        if (!empty($data)) {
-            $jsonData = json_encode($data);
-            if ($jsonData === false) {
-                curl_close($ch);
-                throw new \Exception('Failed to encode request data to JSON');
-            }
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
+        if ($response->getStatusCode() < 200 || $response->getStatusCode() >= 300) {
+            throw new MonoApiException(
+                $response->getStatusCode(),
+                $method,
+                $url,
+                $response->getBody(),
+                $this->decodeJsonSafely($response->getBody())
+            );
         }
 
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
-        $curlErrno = curl_errno($ch);
-        curl_close($ch);
-
-        if ($curlErrno !== 0) {
-            throw new \Exception("cURL error ({$curlErrno}): {$curlError}");
+        $body = trim($response->getBody());
+        if ($body === '') {
+            return [];
         }
 
-        if ($response === false) {
-            throw new \Exception('Failed to execute cURL request');
+        try {
+            $decoded = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            throw new MonoJsonException('Failed to decode JSON response: ' . $e->getMessage(), 0, $e);
         }
 
-        if ($httpCode < 200 || $httpCode >= 300) {
-            throw new \Exception("HTTP error {$httpCode}: {$response}");
-        }
-
-        $decoded = json_decode($response, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new \Exception('Failed to decode JSON response: ' . json_last_error_msg());
+        if (!is_array($decoded)) {
+            throw new MonoJsonException('Monobank response must be a JSON object or array');
         }
 
         return $decoded;
+    }
+
+    /**
+     * @param array<string, mixed> $query
+     */
+    protected function buildUrl(string $endpoint = '', array $query = []): string
+    {
+        $url = $this->baseUrl . $endpoint;
+        $query = array_filter($query, static fn($value) => $value !== null);
+
+        if ($query === []) {
+            return $url;
+        }
+
+        $separator = str_contains($url, '?') ? '&' : '?';
+
+        return $url . $separator . http_build_query($query);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    protected function decodeJsonSafely(string $body): ?array
+    {
+        if (trim($body) === '') {
+            return null;
+        }
+
+        try {
+            $decoded = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            return null;
+        }
+
+        return is_array($decoded) ? $decoded : null;
     }
 }

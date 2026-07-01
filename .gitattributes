@@ -1,0 +1,5 @@
+/.idea export-ignore
+/composer.lock export-ignore
+/test.php export-ignore
+/tests export-ignore
+/vendor export-ignore

@@ -5,12 +5,10 @@ namespace Vladchornyi\Mono\Services;
 class PubkeyService extends AbstractService
 {
     /**
-     * @param int $from
-     * @param int $to
-     * @return mixed
+     * @return array<string, mixed>
      */
-    public function get()
+    public function get(): array
     {
-        return $this->sendRequest('GET', '');
+        return $this->sendRequest('GET');
     }
 }

@@ -55,6 +55,10 @@ class BasketOrderItem
 
 	protected function validate(): void
 	{
+		if (trim($this->name) === '') {
+			throw new InvalidArgumentException('name is required');
+		}
+
 		if ($this->qty <= 0) {
 			throw new InvalidArgumentException('qty must be > 0');
 		}
@@ -67,7 +71,15 @@ class BasketOrderItem
 			throw new InvalidArgumentException('code is required for fiscalization');
 		}
 
-		if ($this->discounts) {
+		if ($this->tax !== null) {
+			foreach ($this->tax as $taxCode) {
+				if (!is_int($taxCode)) {
+					throw new InvalidArgumentException('tax must contain integer tax codes');
+				}
+			}
+		}
+
+		if ($this->discounts !== null) {
 			foreach ($this->discounts as $d) {
 				if (!$d instanceof DiscountItem) {
 					throw new InvalidArgumentException('discounts must contain DiscountItem');
@@ -78,11 +90,11 @@ class BasketOrderItem
 
 	public function toArray(): array
 	{
-		return [
+		return array_filter([
 			'name'      => $this->name,
 			'qty'       => $this->qty,
 			'sum'       => $this->sum,
-			'total'     => intval($this->qty * $this->sum),
+			'total'     => (int) round($this->qty * $this->sum),
 			'code'      => $this->code,
 			'icon'      => $this->icon,
 			'unit'      => $this->unit,
@@ -91,9 +103,9 @@ class BasketOrderItem
 			'footer'    => $this->footer,
 			'tax'       => $this->tax,
 			'uktzed'    => $this->uktzed,
-			'discounts' => $this->discounts
+			'discounts' => $this->discounts !== null
 				? array_map(fn($d) => $d->toArray(), $this->discounts)
 				: null,
-		];
+		], fn($value) => $value !== null);
 	}
 }

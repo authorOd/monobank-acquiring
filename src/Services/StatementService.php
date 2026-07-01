@@ -6,11 +6,16 @@ class StatementService extends AbstractService
 {
     /**
      * @param int $from
-     * @param int $to
-     * @return mixed
+     * @param int|null $to
+     * @param string|null $code
+     * @return array<string, mixed>
      */
-    public function getStatement(int $from, int $to)
+    public function getStatement(int $from, ?int $to = null, ?string $code = null): array
     {
-        return $this->sendRequest('GET', "?&from=$from&to=$to");
+        return $this->sendRequest('GET', '', null, [
+            'from' => $from,
+            'to' => $to,
+            'code' => $code,
+        ]);
     }
 }

@@ -1,17 +1,35 @@
 {
     "name": "vladchornyi/mono",
-    "description": "acquiring mono",
+    "description": "Production-ready PHP client for Monobank Acquiring API",
     "type": "library",
-    "license": "proprietary",
+    "license": "MIT",
+    "keywords": [
+        "monobank",
+        "mono",
+        "acquiring",
+        "payments",
+        "webhooks"
+    ],
     "autoload": {
         "psr-4": {
             "Vladchornyi\\Mono\\": "src/"
         }
     },
-    "minimum-stability": "dev",
+    "autoload-dev": {
+        "psr-4": {
+            "Vladchornyi\\Mono\\Tests\\": "tests/"
+        }
+    },
     "require": {
         "php": "^8.0",
         "ext-curl": "*",
-        "ext-json": "*"
+        "ext-json": "*",
+        "ext-mbstring": "*",
+        "ext-openssl": "*"
+    },
+    "scripts": {
+        "test": "@php tests/run.php",
+        "test:live": "@php tests/live_smoke.php",
+        "test:live-create": "@php tests/live_create_smoke.php"
     }
 }

@@ -50,9 +50,9 @@ class SubscriptionData
 			throw new InvalidArgumentException('Amount must be a positive integer.');
 		}
 
-		if (!in_array($this->ccy, [980, 840])) {
-			throw new InvalidArgumentException('Currency code must be 980 (UAH) or 840 (USD).');
-		}
+			if (!in_array($this->ccy, [980, 840], true)) {
+				throw new InvalidArgumentException('Currency code must be 980 (UAH) or 840 (USD).');
+			}
 
 		if (!filter_var($this->redirectUrl, FILTER_VALIDATE_URL)) {
 			throw new InvalidArgumentException('redirectUrl must be a valid URL.');
@@ -67,9 +67,9 @@ class SubscriptionData
 		}
 
 		$allowedIntervals = ['1m', '3m', '6m', '1y'];
-		if (!in_array($this->interval, $allowedIntervals)) {
-			throw new InvalidArgumentException('Interval must be one of: ' . implode(', ', $allowedIntervals));
-		}
+			if (!in_array($this->interval, $allowedIntervals, true)) {
+				throw new InvalidArgumentException('Interval must be one of: ' . implode(', ', $allowedIntervals));
+			}
 
 		if ($this->validity !== null && $this->validity <= 0) {
 			throw new InvalidArgumentException('Validity must be a positive integer.');

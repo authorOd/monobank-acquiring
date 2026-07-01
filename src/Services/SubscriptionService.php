@@ -10,10 +10,9 @@ class SubscriptionService extends AbstractService
 	 * Create a subscription for recurring payments
 	 *
 	 * @param SubscriptionData $subscriptionData
-	 * @return mixed
-	 * @throws \Exception
+	 * @return array<string, mixed>
 	 */
-	public function createSubscription(SubscriptionData $subscriptionData)
+	public function createSubscription(SubscriptionData $subscriptionData): array
 	{
 		return $this->sendRequest('POST', '/create', $subscriptionData->toArray());
 	}
@@ -22,12 +21,11 @@ class SubscriptionService extends AbstractService
 	 * Get subscription status
 	 *
 	 * @param string $subscriptionId
-	 * @return mixed
-	 * @throws \Exception
+	 * @return array<string, mixed>
 	 */
-	public function getSubscriptionStatus(string $subscriptionId)
+	public function getSubscriptionStatus(string $subscriptionId): array
 	{
-		return $this->sendRequest('GET', "/status?subscriptionId={$subscriptionId}");
+		return $this->sendRequest('GET', '/status', null, ['subscriptionId' => $subscriptionId]);
 	}
 
 	/**
@@ -38,8 +36,7 @@ class SubscriptionService extends AbstractService
 	 * @param string|null $dateTo Format: rfc3339 (2024-06-26T18:12:44+03:00)
 	 * @param int $limit Default 20
 	 * @param int $page Default 1
-	 * @return mixed
-	 * @throws \Exception
+	 * @return array<string, mixed>
 	 */
 	public function getSubscriptionPayments(
 		string $subscriptionId,
@@ -47,7 +44,7 @@ class SubscriptionService extends AbstractService
 		?string $dateTo = null,
 		int $limit = 20,
 		int $page = 1
-	) {
+	): array {
 		$params = [
 			'subscriptionId' => $subscriptionId,
 			'dateFrom' => $dateFrom,
@@ -59,8 +56,7 @@ class SubscriptionService extends AbstractService
 			$params['dateTo'] = $dateTo;
 		}
 
-		$queryString = http_build_query($params);
-		return $this->sendRequest('GET', "/payments?{$queryString}");
+		return $this->sendRequest('GET', '/payments', null, $params);
 	}
 
 	/**
@@ -71,8 +67,7 @@ class SubscriptionService extends AbstractService
 	 * @param string|null $status Status: active, cancelled
 	 * @param int $limit Default 20
 	 * @param int $page Default 1
-	 * @return mixed
-	 * @throws \Exception
+	 * @return array<string, mixed>
 	 */
 	public function getSubscriptionList(
 		string $dateFrom,
@@ -80,7 +75,7 @@ class SubscriptionService extends AbstractService
 		?string $status = null,
 		int $limit = 20,
 		int $page = 1
-	) {
+	): array {
 		$params = [
 			'dateFrom' => $dateFrom,
 			'limit' => $limit,
@@ -95,18 +90,16 @@ class SubscriptionService extends AbstractService
 			$params['status'] = $status;
 		}
 
-		$queryString = http_build_query($params);
-		return $this->sendRequest('GET', "/list?{$queryString}");
+		return $this->sendRequest('GET', '/list', null, $params);
 	}
 
 	/**
 	 * Cancel/remove subscription
 	 *
 	 * @param string $subscriptionId
-	 * @return mixed
-	 * @throws \Exception
+	 * @return array<string, mixed>
 	 */
-	public function cancelSubscription(string $subscriptionId)
+	public function cancelSubscription(string $subscriptionId): array
 	{
 		return $this->sendRequest('POST', '/remove', ['subscriptionId' => $subscriptionId]);
 	}
@@ -117,10 +110,9 @@ class SubscriptionService extends AbstractService
 	 * @param string $subscriptionId
 	 * @param string $action Action: cancel
 	 * @param int|null $refundAmount Amount to refund in kopiykas
-	 * @return mixed
-	 * @throws \Exception
+	 * @return array<string, mixed>
 	 */
-	public function editSubscription(string $subscriptionId, string $action, ?int $refundAmount = null)
+	public function editSubscription(string $subscriptionId, string $action, ?int $refundAmount = null): array
 	{
 		$data = [
 			'subscriptionId' => $subscriptionId,
