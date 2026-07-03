@@ -1,5 +1,11 @@
 # Monobank Acquiring PHP Client
 
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/vladchornyi/mono.svg)](https://packagist.org/packages/vladchornyi/mono)
+[![Total Downloads](https://img.shields.io/packagist/dt/vladchornyi/mono.svg)](https://packagist.org/packages/vladchornyi/mono)
+[![PHP Version](https://img.shields.io/packagist/php-v/vladchornyi/mono.svg)](https://packagist.org/packages/vladchornyi/mono)
+[![License](https://img.shields.io/packagist/l/vladchornyi/mono.svg)](LICENSE)
+[![GitHub Release](https://img.shields.io/github/v/release/authorOd/monobank-acquiring?display_name=tag)](https://github.com/authorOd/monobank-acquiring/releases)
+
 Production-ready PHP client for the Monobank Acquiring API: invoices,
 subscriptions, statements, merchant details, webhook signature verification, and
 structured error handling.
