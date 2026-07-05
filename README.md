@@ -46,21 +46,6 @@ $merchant = $mono->merchant()->getDetails();
 $publicKey = $mono->pubkey()->get();
 ```
 
-Custom HTTP options:
-
-```php
-$mono = new MonoClient(
-    apiKey: $_ENV['MONO_KEY'],
-    baseUrl: 'https://api.monobank.ua/api/merchant',
-    httpOptions: [
-        'timeout' => 30,
-        'connect_timeout' => 10,
-        'verify_peer' => true,
-        'user_agent' => 'example-store/1.0',
-    ]
-);
-```
-
 ## Documentation
 
 - [Installation and client setup](docs/installation.md)
