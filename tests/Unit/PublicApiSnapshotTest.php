@@ -7,7 +7,7 @@ use Vladchornyi\Mono\Tests\Support\PublicApiSnapshot;
 
 final class PublicApiSnapshotTest extends TestCase
 {
-    private const V2_API_HASH = '37f11f7a7acfff963e0bc0927aec4ed5f6097625af8a9d9e4db7267e15703006';
+    private const V2_API_HASH = '8865f24ed49588f10d8b0791a1fab091dd463fcfaa4dd1d40a10beeb68b9042f';
 
     public function testV2PublicApiMatchesTheReviewedSnapshot(): void
     {

@@ -42,23 +42,19 @@ final class WebhookServiceTest extends TestCase
 
     private function resetProcessGuards(): void
     {
-        $reflection = new \ReflectionProperty(CachedPublicKeyProvider::class, 'processGuards');
-        $reflection->setAccessible(true);
+        $reflection = $this->privateProperty(CachedPublicKeyProvider::class, 'processGuards');
         $reflection->setValue(null, []);
 
-        $warned = new \ReflectionProperty(MonoClient::class, 'processLocalCacheWarned');
-        $warned->setAccessible(true);
+        $warned = $this->privateProperty(MonoClient::class, 'processLocalCacheWarned');
         $warned->setValue(null, false);
 
-        $shared = new \ReflectionProperty(ArrayPublicKeyCache::class, 'processShared');
-        $shared->setAccessible(true);
+        $shared = $this->privateProperty(ArrayPublicKeyCache::class, 'processShared');
         $shared->setValue(null, null);
     }
 
     private function assertProcessGuardMissing(string $guardKey): void
     {
-        $reflection = new \ReflectionProperty(CachedPublicKeyProvider::class, 'processGuards');
-        $reflection->setAccessible(true);
+        $reflection = $this->privateProperty(CachedPublicKeyProvider::class, 'processGuards');
 
         self::assertArrayNotHasKey($guardKey, $reflection->getValue());
     }
@@ -251,10 +247,8 @@ final class WebhookServiceTest extends TestCase
             $client->pubkey(),
             cache: new ArrayPublicKeyCache()
         );
-        $wait = new \ReflectionProperty(CachedPublicKeyProvider::class, 'refreshWaitMilliseconds');
-        $poll = new \ReflectionProperty(CachedPublicKeyProvider::class, 'refreshPollMilliseconds');
-        $wait->setAccessible(true);
-        $poll->setAccessible(true);
+        $wait = $this->privateProperty(CachedPublicKeyProvider::class, 'refreshWaitMilliseconds');
+        $poll = $this->privateProperty(CachedPublicKeyProvider::class, 'refreshPollMilliseconds');
 
         self::assertSame(250, $wait->getValue($provider));
         self::assertSame(10, $poll->getValue($provider));
@@ -1053,7 +1047,7 @@ final class WebhookServiceTest extends TestCase
         self::assertNotSame($firstFingerprint, $secondFingerprint);
         self::assertNotSame($firstFingerprint, $thirdFingerprint);
 
-        $cacheKey = new \ReflectionProperty(CachedPublicKeyProvider::class, 'cacheKey');
+        $cacheKey = $this->privateProperty(CachedPublicKeyProvider::class, 'cacheKey');
         foreach (
             [
                 [$firstProvider, $firstFingerprint],
@@ -1079,8 +1073,8 @@ final class WebhookServiceTest extends TestCase
         $first = new CachedPublicKeyProvider($client->pubkey(), cache: $cache, cacheKey: 'owner-safe');
         $second = new CachedPublicKeyProvider($client->pubkey(), cache: $cache, cacheKey: 'owner-safe');
         $third = new CachedPublicKeyProvider($client->pubkey(), cache: $cache, cacheKey: 'owner-safe');
-        $acquire = new \ReflectionMethod(CachedPublicKeyProvider::class, 'acquireGuard');
-        $release = new \ReflectionMethod(CachedPublicKeyProvider::class, 'releaseGuard');
+        $acquire = $this->privateMethod(CachedPublicKeyProvider::class, 'acquireGuard');
+        $release = $this->privateMethod(CachedPublicKeyProvider::class, 'releaseGuard');
         $firstOwner = $acquire->invoke($first, ':refresh-lock', 1);
         self::assertIsString($firstOwner);
 
@@ -1117,9 +1111,9 @@ final class WebhookServiceTest extends TestCase
             cache: $cache,
             cacheKey: 'publish-owner-safe'
         );
-        $acquire = new \ReflectionMethod(CachedPublicKeyProvider::class, 'acquireGuard');
-        $release = new \ReflectionMethod(CachedPublicKeyProvider::class, 'releaseGuard');
-        $fetchAndStore = new \ReflectionMethod(CachedPublicKeyProvider::class, 'fetchAndStore');
+        $acquire = $this->privateMethod(CachedPublicKeyProvider::class, 'acquireGuard');
+        $release = $this->privateMethod(CachedPublicKeyProvider::class, 'releaseGuard');
+        $fetchAndStore = $this->privateMethod(CachedPublicKeyProvider::class, 'fetchAndStore');
         $expiredOwner = $acquire->invoke($expiredProvider, ':refresh-lock', 1);
         self::assertIsString($expiredOwner);
 
@@ -1135,7 +1129,7 @@ final class WebhookServiceTest extends TestCase
         self::assertSame($replacementRecord, $cache->get('publish-owner-safe'));
         self::assertCount(1, $http->requests);
 
-        $localRecord = new \ReflectionProperty(CachedPublicKeyProvider::class, 'localRecord');
+        $localRecord = $this->privateProperty(CachedPublicKeyProvider::class, 'localRecord');
         self::assertSame($replacementPublicKey, $localRecord->getValue($expiredProvider)['key'] ?? null);
 
         $release->invoke($expiredProvider, ':refresh-lock', $expiredOwner);
@@ -1154,8 +1148,8 @@ final class WebhookServiceTest extends TestCase
             cache: $cache,
             cacheKey: 'lost-owner'
         );
-        $acquire = new \ReflectionMethod(CachedPublicKeyProvider::class, 'acquireGuard');
-        $fetchAndStore = new \ReflectionMethod(CachedPublicKeyProvider::class, 'fetchAndStore');
+        $acquire = $this->privateMethod(CachedPublicKeyProvider::class, 'acquireGuard');
+        $fetchAndStore = $this->privateMethod(CachedPublicKeyProvider::class, 'fetchAndStore');
         $owner = $acquire->invoke($provider, ':refresh-lock', 60);
         self::assertIsString($owner);
         $cache->set('lost-owner:refresh-lock', 'replacement-owner', 60);
@@ -1168,7 +1162,7 @@ final class WebhookServiceTest extends TestCase
         }
 
         self::assertNull($cache->get('lost-owner'));
-        $localRecord = new \ReflectionProperty(CachedPublicKeyProvider::class, 'localRecord');
+        $localRecord = $this->privateProperty(CachedPublicKeyProvider::class, 'localRecord');
         self::assertNull($localRecord->getValue($provider));
         self::assertCount(1, $http->requests);
     }
@@ -1188,13 +1182,13 @@ final class WebhookServiceTest extends TestCase
             staleTtl: 1,
             cacheKey: 'expired-local-owner'
         );
-        $localRecord = new \ReflectionProperty(CachedPublicKeyProvider::class, 'localRecord');
+        $localRecord = $this->privateProperty(CachedPublicKeyProvider::class, 'localRecord');
         $localRecord->setValue($provider, [
             'key' => $expiredPublicKey,
             'fetchedAt' => time() - 2,
         ]);
-        $acquire = new \ReflectionMethod(CachedPublicKeyProvider::class, 'acquireGuard');
-        $fetchAndStore = new \ReflectionMethod(CachedPublicKeyProvider::class, 'fetchAndStore');
+        $acquire = $this->privateMethod(CachedPublicKeyProvider::class, 'acquireGuard');
+        $fetchAndStore = $this->privateMethod(CachedPublicKeyProvider::class, 'fetchAndStore');
         $owner = $acquire->invoke($provider, ':refresh-lock', 120);
         self::assertIsString($owner);
         $cache->set('expired-local-owner:refresh-lock', 'replacement-owner', 120);
@@ -1585,6 +1579,26 @@ final class WebhookServiceTest extends TestCase
 
         $this->expectException(MonoWebhookException::class);
         $webhooks->getModifiedDate(['modifiedDate' => 'tomorrow']);
+    }
+
+    private function privateProperty(string $class, string $name): \ReflectionProperty
+    {
+        $property = new \ReflectionProperty($class, $name);
+        if (PHP_VERSION_ID < 80100) {
+            $property->setAccessible(true);
+        }
+
+        return $property;
+    }
+
+    private function privateMethod(string $class, string $name): \ReflectionMethod
+    {
+        $method = new \ReflectionMethod($class, $name);
+        if (PHP_VERSION_ID < 80100) {
+            $method->setAccessible(true);
+        }
+
+        return $method;
     }
 
     private function payload(): string

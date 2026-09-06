@@ -8,6 +8,7 @@ use ReflectionClass;
 use ReflectionMethod;
 use ReflectionParameter;
 use ReflectionProperty;
+use ReflectionType;
 use RuntimeException;
 use SplFileInfo;
 
@@ -72,7 +73,7 @@ final class PublicApiSnapshot
             }
 
             $properties[$property->getName()] = [
-                'type' => $property->hasType() ? (string) $property->getType() : null,
+                'type' => self::captureType($property->getType(), $class),
                 'static' => $property->isStatic(),
             ];
         }
@@ -115,7 +116,7 @@ final class PublicApiSnapshot
                 static fn(ReflectionParameter $parameter): array => self::captureParameter($parameter),
                 $method->getParameters()
             ),
-            'returnType' => $method->hasReturnType() ? (string) $method->getReturnType() : null,
+            'returnType' => self::captureType($method->getReturnType(), $method->getDeclaringClass()),
         ];
     }
 
@@ -126,7 +127,7 @@ final class PublicApiSnapshot
     {
         $captured = [
             'name' => $parameter->getName(),
-            'type' => $parameter->hasType() ? (string) $parameter->getType() : null,
+            'type' => self::captureType($parameter->getType(), $parameter->getDeclaringClass()),
             'byReference' => $parameter->isPassedByReference(),
             'variadic' => $parameter->isVariadic(),
             'optional' => $parameter->isOptional(),
@@ -139,6 +140,24 @@ final class PublicApiSnapshot
         }
 
         return $captured;
+    }
+
+    private static function captureType(?ReflectionType $type, ?ReflectionClass $class): ?string
+    {
+        if ($type === null) {
+            return null;
+        }
+
+        // PHP 8.5 resolves self/parent in Reflection; normalize earlier versions too.
+        $names = ['self' => $class !== null ? $class->getName() : 'self'];
+        $parent = $class !== null ? $class->getParentClass() : false;
+        $names['parent'] = $parent !== false ? $parent->getName() : 'parent';
+
+        return preg_replace_callback(
+            '/\b(self|parent)\b/',
+            static fn(array $match): string => $names[$match[1]],
+            (string) $type
+        );
     }
 
     /**
