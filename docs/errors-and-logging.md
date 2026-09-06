@@ -11,16 +11,23 @@ The SDK throws structured exceptions:
 
 ```php
 use Vladchornyi\Mono\Exceptions\MonoApiException;
+use Vladchornyi\Mono\Support\SensitiveData;
 
 try {
     $invoice = $mono->invoices()->createInvoice($invoiceData);
 } catch (MonoApiException $e) {
-    report([
-        'status' => $e->getStatusCode(),
-        'body' => $e->getResponseData(),
+    $logger->error('Monobank API request failed', $e->getSafeContext() + [
+        'response' => SensitiveData::sanitize($e->getResponseData()),
     ]);
 }
 ```
+
+`MonoApiException::getMessage()` contains only the status, method, and URL path,
+so a default exception logger never records query values such as `cardToken`,
+`walletId`, or a receipt `email`. `getSafeContext()` returns `status`, `method`,
+`path`, `safe_url` (sensitive query values replaced with `[redacted]`),
+`request_id`, `err_code`, and `retry_after`. `getUrl()` still returns the raw
+request URL and must not be logged as-is; use `getSafeUrl()` or `getPath()`.
 
 ## Safe Logging
 
@@ -30,23 +37,53 @@ application logs.
 ```php
 use Vladchornyi\Mono\Support\SensitiveData;
 
-$logger->info('Monobank webhook received', SensitiveData::sanitize([
-    'headers' => $headers,
-    'payload' => $payload,
-]));
+$logger->info('Monobank webhook received', [
+    'headers' => SensitiveData::sanitizeHeaders($headers),
+    'payload' => SensitiveData::sanitize($payload),
+]);
 ```
+
+To log selected diagnostic headers, pass them as explicit safe entries:
+
+```php
+use Vladchornyi\Mono\Support\SensitiveData;
+
+$headers = [
+    'Content-Type' => 'application/json',
+    'X-Request-Id' => 'request-1',
+    'X-Correlation-Id' => 'corr-1',
+    'Traceparent' => '00-...',
+];
+
+$logger->info('Monobank webhook received', [
+    'headers' => SensitiveData::sanitizeHeaders(
+        $headers,
+        ['X-Correlation-Id', 'Traceparent']
+    ),
+]);
+```
+
+Unknown headers are redacted by default. Caller-supplied safe headers are merged into
+the built-in allowlist, and the SDK keeps redacting built-in sensitive names even if
+they are repeated in `additionalSafeHeaders`.
 
 For typed webhook payloads:
 
+`MonoClient::webhooks()` fetches and caches the public key itself (inject a
+shared `publicKeyCache` on multi-worker deployments); a trusted key may instead
+be passed as the third argument. See [Webhooks](webhooks.md#verify-and-parse).
+
 ```php
-$event = $mono->webhooks()->parseVerifiedPayload($rawBody, $xSign, $cachedPublicKey);
+$event = $mono->webhooks()->parseVerifiedPayload($rawBody, $xSign);
 
 $logger->info('Monobank webhook received', [
     'type' => $event->type(),
-    'eventKey' => $event->eventKey(),
+    'deduplicationKey' => $event->deduplicationKey(),
     'payload' => $event->safeArray(),
 ]);
 ```
 
-The helper masks values for sensitive keys such as `X-Sign`, `X-Token`,
-`cardToken`, `walletId`, `maskedPan`, `rrn`, `approvalCode`, emails, and tokens.
+The helpers fully redact values for sensitive keys such as `X-Sign`, `X-Token`,
+cookies, API keys, client secrets, access/refresh tokens, `cardToken`, `walletId`,
+`maskedPan`, `rrn`, `approvalCode`, and emails. `sanitizeHeaders()` uses a safe
+allowlist and redacts unknown headers by default.

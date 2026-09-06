@@ -5,6 +5,7 @@ use Vladchornyi\Mono\Models\InvoiceData;
 use Vladchornyi\Mono\Models\SubscriptionData;
 use Vladchornyi\Mono\MonoClient;
 use Vladchornyi\Mono\Support\SensitiveData;
+use Vladchornyi\Mono\Support\PackageVersion;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -70,6 +71,23 @@ function live_create_result(string $name, callable $callback): array
     }
 }
 
+function live_create_boolean_env(string $name, bool $default): bool
+{
+    $value = getenv($name);
+
+    if ($value === false || $value === '') {
+        return $default;
+    }
+
+    $parsed = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+
+    if (!is_bool($parsed)) {
+        throw new InvalidArgumentException("{$name} must be one of: true, false, 1, 0, yes, no, on, off.");
+    }
+
+    return $parsed;
+}
+
 [$key, $source] = live_create_key_source();
 
 if ($key === null) {
@@ -77,7 +95,15 @@ if ($key === null) {
         'status' => 'skipped',
         'reason' => 'Set MONO_KEY or MONO_ENV_FILE to run live create smoke tests.',
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), PHP_EOL;
-    exit(2);
+    exit(0);
+}
+
+if (getenv('MONO_LIVE_CREATE_CONFIRM') !== 'yes') {
+    echo json_encode([
+        'status' => 'skipped',
+        'reason' => 'Set MONO_LIVE_CREATE_CONFIRM=yes to acknowledge that this test creates live API resources.',
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), PHP_EOL;
+    exit(0);
 }
 
 $client = new MonoClient(
@@ -85,11 +111,11 @@ $client = new MonoClient(
     httpOptions: [
         'timeout' => 15,
         'connect_timeout' => 5,
-        'user_agent' => 'vladchornyi-mono-live-create-smoke/1.4',
+        'user_agent' => 'vladchornyi-mono-live-create-smoke/' . PackageVersion::get(),
     ]
 );
 
-$cleanup = filter_var(getenv('MONO_LIVE_CREATE_CLEANUP') ?: 'true', FILTER_VALIDATE_BOOLEAN);
+$cleanup = live_create_boolean_env('MONO_LIVE_CREATE_CLEANUP', true);
 
 $checks = [];
 
@@ -108,6 +134,7 @@ $checks[] = live_create_result('create_invoice', function () use ($client, $clea
     $hasInvoiceId = is_string($invoiceId) && $invoiceId !== '';
     $hasPageUrl = is_string($pageUrl) && $pageUrl !== '';
     $removed = null;
+    $cleanupError = null;
 
     if ($cleanup && $hasInvoiceId) {
         try {
@@ -115,6 +142,7 @@ $checks[] = live_create_result('create_invoice', function () use ($client, $clea
             $removed = true;
         } catch (Throwable $e) {
             $removed = false;
+            $cleanupError = get_class($e) . ': ' . $e->getMessage();
         }
     }
 
@@ -123,7 +151,9 @@ $checks[] = live_create_result('create_invoice', function () use ($client, $clea
         'has_invoice_id' => $hasInvoiceId,
         'has_page_url' => $hasPageUrl,
         'invoice_id_prefix' => is_string($invoiceId) ? substr($invoiceId, 0, 4) : null,
+        'invoice_id_for_manual_cleanup' => (!$cleanup || $removed === false) ? $invoiceId : null,
         'cleanup_removed' => $removed,
+        'cleanup_error' => $cleanupError,
         'response_keys' => array_keys($invoice),
     ];
 });
@@ -146,13 +176,15 @@ $checks[] = live_create_result('create_subscription', function () use ($client, 
     $hasSubscriptionId = is_string($subscriptionId) && $subscriptionId !== '';
     $hasPageUrl = is_string($pageUrl) && $pageUrl !== '';
     $removed = null;
+    $cleanupError = null;
 
     if ($cleanup && $hasSubscriptionId) {
         try {
-            $client->subscriptions()->cancelSubscription($subscriptionId);
+            $client->subscriptions()->removeSubscription($subscriptionId);
             $removed = true;
         } catch (Throwable $e) {
             $removed = false;
+            $cleanupError = get_class($e) . ': ' . $e->getMessage();
         }
     }
 
@@ -161,7 +193,9 @@ $checks[] = live_create_result('create_subscription', function () use ($client, 
         'has_subscription_id' => $hasSubscriptionId,
         'has_page_url' => $hasPageUrl,
         'subscription_id_prefix' => is_string($subscriptionId) ? substr($subscriptionId, 0, 4) : null,
+        'subscription_id_for_manual_cleanup' => (!$cleanup || $removed === false) ? $subscriptionId : null,
         'cleanup_removed' => $removed,
+        'cleanup_error' => $cleanupError,
         'response_keys' => array_keys($subscription),
     ];
 });

@@ -2,6 +2,7 @@
 
 use Vladchornyi\Mono\Exceptions\MonoApiException;
 use Vladchornyi\Mono\MonoClient;
+use Vladchornyi\Mono\Support\PackageVersion;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -53,7 +54,7 @@ if ($key === null) {
         'status' => 'skipped',
         'reason' => 'Set MONO_KEY or MONO_ENV_FILE to run live Monobank smoke tests.',
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), PHP_EOL;
-    exit(2);
+    exit(0);
 }
 
 $client = new MonoClient(
@@ -61,7 +62,7 @@ $client = new MonoClient(
     httpOptions: [
         'timeout' => 10,
         'connect_timeout' => 5,
-        'user_agent' => 'vladchornyi-mono-live-smoke/1.4',
+        'user_agent' => 'vladchornyi-mono-live-smoke/' . PackageVersion::get(),
     ]
 );
 

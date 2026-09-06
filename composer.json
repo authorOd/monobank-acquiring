@@ -1,6 +1,6 @@
 {
     "name": "vladchornyi/mono",
-    "description": "Production-ready PHP client for Monobank Acquiring API",
+    "description": "PHP client for the Monobank Acquiring API",
     "type": "library",
     "license": "MIT",
     "keywords": [
@@ -17,19 +17,46 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Vladchornyi\\Mono\\Tests\\": "tests/"
+            "Vladchornyi\\Mono\\Tests\\": "tests/",
+            "Vladchornyi\\Mono\\Examples\\": "examples/"
         }
     },
     "require": {
         "php": "^8.0",
-        "ext-curl": "*",
         "ext-json": "*",
-        "ext-mbstring": "*",
-        "ext-openssl": "*"
+        "ext-mbstring": "*"
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^1.12",
+        "phpunit/phpunit": "^9.6",
+        "squizlabs/php_codesniffer": "^3.13.6"
+    },
+    "suggest": {
+        "ext-curl": "Required by the default CurlHttpClient; not needed when injecting a custom HTTP client.",
+        "ext-openssl": "Required for built-in webhook signature verification."
     },
     "scripts": {
-        "test": "@php tests/run.php",
+        "test": "@php vendor/bin/phpunit",
+        "test:ci": "@php vendor/bin/phpunit --fail-on-skipped",
+        "test:coverage": [
+            "@php vendor/bin/phpunit --coverage-text --coverage-clover=build/coverage.xml",
+            "@php tests/check_coverage.php build/coverage.xml 90 90"
+        ],
+        "test:release": "@php vendor/bin/phpunit --fail-on-skipped --testsuite contract,migration,regression,docs",
+        "test:legacy": "@php tests/run.php",
         "test:live": "@php tests/live_smoke.php",
-        "test:live-create": "@php tests/live_create_smoke.php"
+        "test:live-create": "@php tests/live_create_smoke.php",
+        "analyse": "@php vendor/bin/phpstan analyse --debug --memory-limit=512M",
+        "cs": "@php vendor/bin/phpcs",
+        "cs:fix": "@php vendor/bin/phpcbf",
+        "check": [
+            "@test:ci",
+            "@test:release",
+            "@analyse",
+            "@cs"
+        ]
+    },
+    "config": {
+        "sort-packages": true
     }
 }

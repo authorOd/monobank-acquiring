@@ -1,0 +1,7 @@
+{
+ "source": "monobank acquiring OpenAPI v2412, webhook verification example",
+ "publicKeyBase64": "LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUZrd0V3WUhLb1pJemowQ0FRWUlLb1pJemowREFRY0RRZ0FFQUc1LzZ3NnZubGJZb0ZmRHlYWE4vS29CbVVjTgo3NWJSUWg4MFBhaEdldnJoanFCQnI3OXNSS0JSbnpHODFUZVQ5OEFOakU1c0R3RmZ5Znhub0ZJcmZBPT0KLS0tLS1FTkQgUFVCTElDIEtFWS0tLS0tCg==",
+ "xSignBase64": "MEUCIQC/mVKhi8FKoayul2Mim3E2oaIOCNJk5dEXxTqbkeJSOQIgOM0hsW0qcP2H8iXy1aQYpmY0SJWEaWur7nQXlKDCFxA=",
+ "body": "{\n    \"invoiceId\": \"p2_9ZgpZVsl3\",\n    \"status\": \"created\",\n    \"failureReason\": \"string\",\n    \"amount\": 4200,\n    \"ccy\": 980,\n    \"finalAmount\": 4200,\n    \"createdDate\": \"2019-08-24T14:15:22Z\",\n    \"modifiedDate\": \"2019-08-24T14:15:22Z\",\n    \"reference\": \"84d0070ee4e44667b31371d8f8813947\",\n    \"cancelList\": [\n      {\n        \"status\": \"processing\",\n        \"amount\": 4200,\n        \"ccy\": 980,\n        \"createdDate\": \"2019-08-24T14:15:22Z\",\n        \"modifiedDate\": \"2019-08-24T14:15:22Z\",\n        \"approvalCode\": \"662476\",\n        \"rrn\": \"060189181768\",\n        \"extRef\": \"635ace02599849e981b2cd7a65f417fe\"\n      }\n    ]\n  }",
+ "note": "Published by Monobank as a verification example. The signature does not validate against the published body (whitespace was lost in the docs), so this fixture proves only that the SDK accepts the real key and signature FORMAT (EC P-256 key, 71-byte DER ECDSA signature)."
+}

@@ -2,6 +2,9 @@
 
 namespace Vladchornyi\Mono\Services;
 
+use InvalidArgumentException;
+use Vladchornyi\Mono\Support\InputValidator;
+
 class StatementService extends AbstractService
 {
     /**
@@ -12,6 +15,20 @@ class StatementService extends AbstractService
      */
     public function getStatement(int $from, ?int $to = null, ?string $code = null): array
     {
+        InputValidator::nonNegativeInt($from, 'from');
+
+        if ($to !== null) {
+            InputValidator::nonNegativeInt($to, 'to');
+
+            if ($to < $from) {
+                throw new InvalidArgumentException('to must be greater than or equal to from.');
+            }
+        }
+
+        if ($code !== null) {
+            InputValidator::nonEmptyString($code, 'code');
+        }
+
         return $this->sendRequest('GET', '', null, [
             'from' => $from,
             'to' => $to,

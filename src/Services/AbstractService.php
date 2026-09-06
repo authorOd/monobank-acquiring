@@ -6,6 +6,7 @@ use Vladchornyi\Mono\Contracts\HttpClientInterface;
 use Vladchornyi\Mono\Exceptions\MonoApiException;
 use Vladchornyi\Mono\Exceptions\MonoJsonException;
 use Vladchornyi\Mono\Http\CurlHttpClient;
+use Vladchornyi\Mono\Support\InputValidator;
 
 abstract class AbstractService
 {
@@ -13,20 +14,34 @@ abstract class AbstractService
     protected string $baseUrl;
     protected HttpClientInterface $httpClient;
 
+    /** @var array<string, string> */
+    protected array $defaultHeaders;
+
     /**
      * @param string $apiKey
      * @param array<string, mixed> $httpOptions
+     * @param array<string, string> $defaultHeaders Extra headers sent with every request (e.g. X-Cms).
      */
     public function __construct(
         string $apiKey,
         string $baseUrl,
         ?HttpClientInterface $httpClient = null,
-        array $httpOptions = []
-    )
-    {
+        array $httpOptions = [],
+        array $defaultHeaders = []
+    ) {
+        InputValidator::nonEmptyString($apiKey, 'apiKey');
+        InputValidator::httpUrl($baseUrl, 'baseUrl');
+
+        foreach ($defaultHeaders as $name => $value) {
+            if (!is_string($name) || trim($name) === '' || !is_string($value)) {
+                throw new \InvalidArgumentException('Default headers must be a non-empty string-to-string map.');
+            }
+        }
+
         $this->apiKey = $apiKey;
         $this->baseUrl = rtrim($baseUrl, '/');
         $this->httpClient = $httpClient ?? new CurlHttpClient($httpOptions);
+        $this->defaultHeaders = $defaultHeaders;
     }
 
     /**
@@ -34,7 +49,7 @@ abstract class AbstractService
      * @param string $endpoint
      * @param array<string, mixed>|null $data
      * @param array<string, mixed> $query
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      */
     protected function sendRequest(string $method, string $endpoint = '', ?array $data = null, array $query = []): array
     {
@@ -44,10 +59,17 @@ abstract class AbstractService
             ? null
             : array_filter($data, static fn($value) => $value !== null);
 
-        $response = $this->httpClient->send($method, $url, [
+        $headers = $this->defaultHeaders + [
             'X-Token' => $this->apiKey,
-            'Content-Type: application/json',
-        ], $payload);
+            'Accept' => 'application/json',
+        ];
+        $headers['X-Token'] = $this->apiKey;
+
+        if ($payload !== null) {
+            $headers['Content-Type'] = 'application/json';
+        }
+
+        $response = $this->httpClient->send($method, $url, $headers, $payload);
 
         if ($response->getStatusCode() < 200 || $response->getStatusCode() >= 300) {
             throw new MonoApiException(
@@ -55,7 +77,8 @@ abstract class AbstractService
                 $method,
                 $url,
                 $response->getBody(),
-                $this->decodeJsonSafely($response->getBody())
+                $this->decodeJsonSafely($response->getBody()),
+                $response->getHeaders()
             );
         }
 
@@ -95,7 +118,7 @@ abstract class AbstractService
     }
 
     /**
-     * @return array<string, mixed>|null
+     * @return array<array-key, mixed>|null
      */
     protected function decodeJsonSafely(string $body): ?array
     {

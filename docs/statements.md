@@ -27,3 +27,13 @@ $statement = $mono->statements()->getStatement(
     code: '0a8637b3bccb42aa93fdeb791b8b58e9'
 );
 ```
+
+## Submerchants and Split Receivers
+
+```php
+$submerchants = $mono->merchant()->getSubmerchants();   // list[].code for InvoiceData::$code
+$receivers = $mono->merchant()->getSplitReceivers();    // list[].splitReceiverId for basket items
+```
+
+Statement rows for split payments include `splitReceiverList` and the
+`metadata` passed in `merchantPaymInfo`.

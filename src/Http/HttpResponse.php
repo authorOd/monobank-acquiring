@@ -37,4 +37,15 @@ class HttpResponse
     {
         return $this->headers;
     }
+
+    public function getHeaderLine(string $name): ?string
+    {
+        foreach ($this->headers as $headerName => $value) {
+            if (strcasecmp($headerName, $name) === 0) {
+                return $value;
+            }
+        }
+
+        return null;
+    }
 }

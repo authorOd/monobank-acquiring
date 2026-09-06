@@ -1,6 +1,8 @@
 /vendor/
+/build/
 .idea/
 .env
 test.php
 *.log
 composer.lock
+.phpunit.result.cache

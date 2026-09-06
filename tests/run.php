@@ -100,6 +100,8 @@ assert_same(
     'Query parameters must be encoded safely'
 );
 assert_same('secret-token', $fake->requests[0]['headers']['X-Token'], 'X-Token header must be sent');
+assert_same('application/json', $fake->requests[0]['headers']['Accept'], 'Accept header must be sent');
+assert_true(!array_key_exists('Content-Type', $fake->requests[0]['headers']), 'GET requests must not send Content-Type');
 
 $fakeError = new FakeHttpClient(new HttpResponse(429, '{"error":"Too many requests"}'));
 $clientWithError = new MonoClient('secret-token', 'https://example.test/api/merchant', $fakeError);
@@ -128,7 +130,12 @@ assert_true(
 );
 
 $pubkeyFake = new FakeHttpClient(new HttpResponse(200, json_encode(['key' => base64_encode($details['key'])])));
-$webhooks = (new MonoClient('secret-token', 'https://example.test/api/merchant', $pubkeyFake))->webhooks();
+$webhooks = (new MonoClient(
+    'secret-token',
+    'https://example.test/api/merchant',
+    $pubkeyFake,
+    publicKeyCache: new \Vladchornyi\Mono\Webhooks\ArrayPublicKeyCache()
+))->webhooks();
 $parsed = $webhooks->parseVerified($payloadJson, base64_encode($signature));
 assert_same('success', $parsed['status'], 'Webhook service must parse verified payloads');
 $invoiceEvent = $webhooks->parseVerifiedPayload($payloadJson, base64_encode($signature), base64_encode($details['key']));
@@ -194,13 +201,21 @@ $subscriptionChargeEvent = WebhookPayload::fromArray([
 assert_same(WebhookPayload::TYPE_SUBSCRIPTION_CHARGE, $subscriptionChargeEvent->type(), 'Subscription charge type must be detected');
 assert_same('p2_charge_123', $subscriptionChargeEvent->invoiceId(), 'Charge invoice id accessor must work');
 assert_true($subscriptionChargeEvent->isFailure(), 'Failure charge status must be detected');
-assert_same('subscription_charge:p2_charge_123', $subscriptionChargeEvent->eventKey(), 'Event key must use invoice id when available');
+assert_same(
+    'subscription_charge:p2_charge_123',
+    $subscriptionChargeEvent->entityKey(),
+    'Entity key must use invoice id when available'
+);
+assert_true(
+    str_starts_with($subscriptionChargeEvent->deduplicationKey(), 'evt:v2:'),
+    'Event key must include the entity id and an event digest'
+);
 
 $sanitized = SensitiveData::sanitize([
     'X-Sign' => 'abcdefghijklmnopqrstuvwxyz',
     'nested' => ['cardToken' => '1234567890abcdef'],
 ]);
-assert_same('abcd******************wxyz', $sanitized['X-Sign'], 'Sensitive headers must be masked');
-assert_same('1234********cdef', $sanitized['nested']['cardToken'], 'Nested sensitive values must be masked');
+assert_same('[redacted]', $sanitized['X-Sign'], 'Sensitive headers must be redacted');
+assert_same('[redacted]', $sanitized['nested']['cardToken'], 'Nested sensitive values must be redacted');
 
 echo "All tests passed\n";

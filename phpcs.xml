@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<ruleset name="vladchornyi-mono">
+    <description>PSR-12 coding standard for the Monobank client.</description>
+    <file>src</file>
+    <file>examples</file>
+    <file>tests</file>
+    <exclude-pattern>tests/fixtures/*</exclude-pattern>
+    <exclude-pattern>tests/run.php</exclude-pattern>
+    <exclude-pattern>tests/live_*.php</exclude-pattern>
+    <arg name="colors"/>
+    <arg value="sp"/>
+    <rule ref="PSR12"/>
+</ruleset>

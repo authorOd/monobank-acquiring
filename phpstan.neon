@@ -1,0 +1,9 @@
+parameters:
+    level: 8
+    paths:
+        - src
+        - examples
+    tmpDir: /tmp/vladchornyi-mono-phpstan
+    reportUnmatchedIgnoredErrors: true
+    parallel:
+        maximumNumberOfProcesses: 1

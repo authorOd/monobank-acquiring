@@ -23,6 +23,12 @@ echo $subscription['subscriptionId'];
 echo $subscription['pageUrl'];
 ```
 
+The interval follows `{positive number}{unit}`, where the unit is `d`, `w`, `m`,
+or `y`. Examples: `1d`, `2w`, `1m`, and `1y`. Currency accepts ISO 4217 numeric
+codes. Redirect and webhook URLs can be passed as `null` when they are not needed;
+when `webHookUrls` is present, both `chargeUrl` and `statusUrl` must be valid HTTP
+or HTTPS URLs.
+
 ## Status
 
 ```php
@@ -53,22 +59,38 @@ $subscriptions = $mono->subscriptions()->getSubscriptionList(
 );
 ```
 
-## Cancel or Edit
+## Cancel, Refund, or Remove
 
 ```php
-$mono->subscriptions()->editSubscription($subscriptionId, 'cancel');
+// Cancel an active subscription (POST /subscription/edit, action=cancel).
 $mono->subscriptions()->cancelSubscription($subscriptionId);
+
+// Cancel and refund 5000 minor units of the last charge.
+$mono->subscriptions()->cancelSubscription($subscriptionId, refundAmount: 5000);
+
+// Same call through the generic edit method.
+$mono->subscriptions()->editSubscription($subscriptionId, 'cancel', 5000);
+
+// Invalidate a subscription that has never been charged (POST /subscription/remove).
+$mono->subscriptions()->removeSubscription($subscriptionId);
 ```
 
+`removeSubscription()` is rejected by Monobank once the subscription has at least
+one payment; use `cancelSubscription()` for those.
+
 If you process subscription charge webhooks, store each charge by `invoiceId` and
-make terminal side effects idempotent.
+make terminal side effects idempotent. To charge a saved card yourself instead of
+using Monobank subscriptions, see `MonoClient::wallet()->payByToken()` in
+[Invoices](invoices.md#charge-a-saved-card).
 
 ## Useful Payload Fields
 
 Subscription status payloads commonly expose:
 
 - `subscriptionId`
-- `status`: `created`, `pending`, `active`, `paused`, `cancelled`, `removed`
+- `status`: Monobank documents `active` and `cancelled`; `created`, `pending`,
+  `paused`, `removed`, `expired`, and `failed` have been observed and are listed
+  in `WebhookPayload::SUBSCRIPTION_STATUSES`
 - `amount`, `ccy`, `interval`
 - `startDate`, `endDate`, `nextChargeDate`
 - `cancellationDesc`
@@ -78,7 +100,7 @@ Subscription status payloads commonly expose:
 Subscription payment history responses commonly expose:
 
 - `payments[].amount`
-- `payments[].status`
+- `payments[].status`: `new`, `success`, `failed`
 - `payments[].ccy`
 - `payments[].chargedAt`
 - `pagination.totalItems`
@@ -88,8 +110,12 @@ Subscription payment history responses commonly expose:
 
 Use the webhook payload helper for status and charge callbacks:
 
+`MonoClient::webhooks()` verifies out of the box; inject a shared `publicKeyCache`
+on multi-worker deployments, or pass a trusted public key as the third argument
+to `parseVerifiedPayload()`. See [Webhooks](webhooks.md#verify-and-parse).
+
 ```php
-$event = $mono->webhooks()->parseVerifiedPayload($rawBody, $xSign, $cachedPublicKey);
+$event = $mono->webhooks()->parseVerifiedPayload($rawBody, $xSign);
 
 if ($event->type() === \Vladchornyi\Mono\Webhooks\WebhookPayload::TYPE_SUBSCRIPTION_STATUS) {
     $subscriptionId = $event->subscriptionId();
