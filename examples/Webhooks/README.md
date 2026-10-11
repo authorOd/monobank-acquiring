@@ -26,7 +26,8 @@ columns/indexes through its own migration rather than relying on `IF NOT EXISTS`
 
 ## Database verification
 
-`tests/Integration/OutboxWorkerTest.php` runs on SQLite by default. CI also runs
+These tests live in the library repository; they are not part of the Composer
+package. `tests/Integration/OutboxWorkerTest.php` runs on SQLite by default. CI also runs
 the same ordering, lease, starvation, rollback, and duplicate-delivery tests
 against MySQL 8.0, MariaDB 10.5, and PostgreSQL 16 using native PDO prepares.
 Each schema is applied twice to check that table and index creation is idempotent.
@@ -44,17 +45,52 @@ contents of the three `webhook_*` tables; never use an application database.
 
 ## Bootstrap
 
-`index.php` and `worker.php` are stand-alone demos for `php -S`; they locate
-`vendor/autoload.php` by walking up from their own directory. In an application
-you wire the two classes into your HTTP controller and your queue/cron runner:
+`index.php` and `worker.php` are stand-alone demos for `php -S`. They share
+`bootstrap.php`, which locates `vendor/autoload.php` by walking up from its own
+directory and opens the database named by the environment, never a file next to
+`index.php`:
+
+| Variable | Meaning |
+| --- | --- |
+| `MONO_KEY` | Merchant token; without it `index.php` answers 503. |
+| `MONO_WEBHOOK_DSN` | PDO DSN. Default: `mono-webhooks.sqlite` in the system temp directory. |
+| `MONO_WEBHOOK_USER`, `MONO_WEBHOOK_PASSWORD` | Optional database credentials. |
+
+Create the tables once, then start the endpoint and the worker:
+
+```bash
+php examples/Webhooks/migrate.php
+MONO_KEY=... php -S localhost:8080 examples/Webhooks/index.php
+php examples/Webhooks/worker.php
+```
+
+In an application you wire the two classes into your HTTP controller and your
+queue/cron runner. Answer 503 when the public key is temporarily unavailable,
+because the signature was not checked; answer 400 only for a rejected signature
+or payload:
 
 ```php
 use App\Payments\Monobank\TransactionalWebhookProcessor;
+use Vladchornyi\Mono\Exceptions\MonoPublicKeyUnavailableException;
+use Vladchornyi\Mono\Exceptions\MonoWebhookException;
 
 $processor = new TransactionalWebhookProcessor($pdo, $mono->webhooks());
-$outcome = $processor->handle($rawBody, $xSign);   // applied | duplicate | stale | retry
+
+try {
+    $outcome = $processor->handle($rawBody, $xSign);   // applied | duplicate | stale | retry
+} catch (MonoPublicKeyUnavailableException $e) {
+    $outcome = TransactionalWebhookProcessor::OUTCOME_RETRY;
+} catch (MonoWebhookException $e) {
+    http_response_code(400);
+    exit;
+}
+
 http_response_code($outcome === TransactionalWebhookProcessor::OUTCOME_RETRY ? 503 : 200);
 ```
+
+`OutboxWorker` replaces a completed job's payload with a redacted copy, so card
+tokens and wallet ids do not remain in `webhook_outbox`. A failed job keeps its
+payload for the retry.
 
 `tests/Integration/ComposerConsumerTest.php` in the library repository installs
 the package as a dependency and verifies both the non-autoloading and the copy

@@ -7,7 +7,12 @@ use Vladchornyi\Mono\Tests\Support\PublicApiSnapshot;
 
 final class PublicApiSnapshotTest extends TestCase
 {
-    private const V2_API_HASH = '8865f24ed49588f10d8b0791a1fab091dd463fcfaa4dd1d40a10beeb68b9042f';
+    /**
+     * 2.1.0 (additive only, reviewed against 2.0.0 `8865f24e…`):
+     * MonoPublicKeyUnavailableException, SubscriptionService::iterateSubscriptionList(),
+     * SubscriptionService::iterateSubscriptionPayments(), InputValidator::secureBaseUrl().
+     */
+    private const V2_API_HASH = 'a1e2174ccf556fd13da241a99c39475345cd9686074544144fe95b381ddc3a43';
 
     public function testV2PublicApiMatchesTheReviewedSnapshot(): void
     {

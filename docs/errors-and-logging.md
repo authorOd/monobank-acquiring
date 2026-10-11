@@ -8,6 +8,10 @@ The SDK throws structured exceptions:
 - `MonoTransportException` - cURL or network failure.
 - `MonoJsonException` - JSON encode/decode failure.
 - `MonoWebhookException` - invalid webhook signature, public key, or payload.
+- `MonoPublicKeyUnavailableException` - a `MonoWebhookException` subclass: the
+  Monobank public key could not be obtained, so the signature was not checked.
+  Respond with a retryable status (503) instead of 400. See
+  [Webhooks](webhooks.md#verify-and-parse).
 
 ```php
 use Vladchornyi\Mono\Exceptions\MonoApiException;
@@ -28,6 +32,21 @@ so a default exception logger never records query values such as `cardToken`,
 `path`, `safe_url` (sensitive query values replaced with `[redacted]`),
 `request_id`, `err_code`, and `retry_after`. `getUrl()` still returns the raw
 request URL and must not be logged as-is; use `getSafeUrl()` or `getPath()`.
+
+## Exception Traces
+
+PHP stores call arguments in exception traces unless
+`zend.exception_ignore_args=On`. That is the production `php.ini` default, but
+not the built-in default, so containers without a `php.ini` keep arguments, and
+error trackers such as Sentry upload them. Every SDK parameter that receives the
+merchant token, the request URL or headers, a card token, a wallet id, an e-mail,
+or a raw webhook body is marked `#[\SensitiveParameter]`. On PHP 8.2 and later
+those values appear as `SensitiveParameterValue` objects in traces.
+
+PHP 8.0 and 8.1 ignore the attribute. On those versions set
+`zend.exception_ignore_args=On` in production. If you implement
+`HttpClientInterface`, repeat `#[\SensitiveParameter]` on `$url`, `$headers`, and
+`$body`, because PHP does not inherit parameter attributes.
 
 ## Safe Logging
 

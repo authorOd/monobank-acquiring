@@ -59,6 +59,28 @@ $subscriptions = $mono->subscriptions()->getSubscriptionList(
 );
 ```
 
+## Iterate Every Page
+
+`getSubscriptionList()` and `getSubscriptionPayments()` return one page. The
+iterators walk all pages for you and yield one item at a time:
+
+```php
+foreach ($mono->subscriptions()->iterateSubscriptionList(dateFrom: $dateFrom, status: 'active') as $subscription) {
+    echo $subscription['subscriptionId'], ' ', $subscription['status'], PHP_EOL;
+}
+
+foreach ($mono->subscriptions()->iterateSubscriptionPayments($subscriptionId, $dateFrom, limit: 50) as $payment) {
+    echo $payment['amount'], ' ', $payment['status'], PHP_EOL;
+}
+```
+
+The first page is requested when you call the method, so invalid arguments and
+API errors surface immediately; later pages are requested while you iterate.
+Iteration ends after `pagination.totalPages`. A list response without `list` is
+treated as empty, because Monobank omits the field when nothing matches. As a
+safety stop the iterators throw `MonoException` after 1000 pages; raise `limit`
+or narrow the date range for very large merchants.
+
 ## Cancel, Refund, or Remove
 
 ```php

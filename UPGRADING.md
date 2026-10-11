@@ -1,3 +1,65 @@
+# Upgrading from 2.0 to 2.1
+
+2.1 is a security and robustness release. Every 2.0 call keeps its signature
+and behavior for valid production setups, with one deliberate exception: a
+plain-HTTP API base URL.
+
+## What Can Stop Requests
+
+1. **`baseUrl` must use HTTPS.** `MonoClient` and directly constructed services
+   now throw `InvalidArgumentException` for an `http://` base URL, because every
+   request carries the merchant token in `X-Token`. Loopback hosts (`localhost`,
+   `127.0.0.0/8`, `[::1]`) stay allowed for local test servers and same-host TLS
+   proxies. The default `https://api.monobank.ua/api/merchant` is unaffected.
+
+## Recommended Changes
+
+1. **Answer 503 when the public key is unavailable.** The new
+   `MonoPublicKeyUnavailableException` extends `MonoWebhookException`, so 2.0
+   handlers still catch it, but they answer 400 to genuine payments whose
+   signature could not be checked. Catch it first:
+
+   ```php
+   use Vladchornyi\Mono\Exceptions\MonoPublicKeyUnavailableException;
+   use Vladchornyi\Mono\Exceptions\MonoWebhookException;
+
+   try {
+       $event = $mono->webhooks()->parseVerifiedPayload($rawBody, $xSign);
+   } catch (MonoPublicKeyUnavailableException $e) {
+       http_response_code(503);   // shared cache down, refresh rate limited, or no usable key
+       exit;
+   } catch (MonoWebhookException $e) {
+       http_response_code(400);   // forged or malformed
+       exit;
+   }
+   ```
+
+   When the shared cache is down, the message now says so (`The shared
+   public-key cache is unavailable and no cached key is available.`) instead of
+   reporting a rate limit, and later calls no longer sleep while polling for a
+   refresh that cannot start.
+2. **Custom `HttpClientInterface` implementations** should repeat
+   `#[\SensitiveParameter]` on `$url`, `$headers`, and `$body`; PHP does not
+   inherit parameter attributes. On PHP 8.0 and 8.1, which ignore the attribute,
+   set `zend.exception_ignore_args=On` so traces never carry the token. See
+   [Errors and Safe Logging](docs/errors-and-logging.md#exception-traces).
+3. **Paginated reads**: replace hand-written page loops with
+   `iterateSubscriptionList()` and `iterateSubscriptionPayments()`. A response
+   without `list` is an empty page, not an error.
+4. **Copied webhook examples**: copy `OutboxWorker.php` again to get payload
+   redaction for completed jobs. The stand-alone demo now needs
+   `php examples/Webhooks/migrate.php` once and reads `MONO_WEBHOOK_DSN`.
+
+## Unchanged
+
+- Public method names, parameters, and return types of 2.0. Parameter
+  attributes do not change signatures.
+- `catch (MonoWebhookException $e)` still matches every webhook failure.
+- `CurlHttpClient::__destruct()` still exists for subclasses; it no longer calls
+  `curl_close()`, which PHP 8.5 deprecates.
+- The Composer package no longer ships `tests/` or the tool configuration files;
+  nothing under `src/`, `docs/`, or `examples/` was removed.
+
 # Upgrading from 1.x to 2.0
 
 Every statement below was checked against the `v1.4.0` tag and the 2.0 code.

@@ -55,7 +55,7 @@ class WebhookPayload
     /**
      * @param array<string, mixed> $data
      */
-    public function __construct(array $data)
+    public function __construct(#[\SensitiveParameter] array $data)
     {
         $this->data = $data;
     }
@@ -63,7 +63,7 @@ class WebhookPayload
     /**
      * @param array<string, mixed> $data
      */
-    public static function fromArray(array $data): self
+    public static function fromArray(#[\SensitiveParameter] array $data): self
     {
         return new self($data);
     }

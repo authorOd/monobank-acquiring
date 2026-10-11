@@ -117,6 +117,8 @@ final class DocumentationConsistencyTest extends TestCase
         }
 
         $exampleFiles = [
+            'bootstrap.php',
+            'migrate.php',
             'index.php',
             'worker.php',
             'schema.sql',

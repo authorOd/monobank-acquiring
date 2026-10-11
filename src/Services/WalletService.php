@@ -16,7 +16,7 @@ class WalletService extends AbstractService
      *
      * @return array<string, mixed>
      */
-    public function getCards(string $walletId): array
+    public function getCards(#[\SensitiveParameter] string $walletId): array
     {
         InputValidator::nonEmptyString($walletId, 'walletId');
 
@@ -38,7 +38,7 @@ class WalletService extends AbstractService
      *
      * @return array<string, mixed>
      */
-    public function deleteCard(string $cardToken): array
+    public function deleteCard(#[\SensitiveParameter] string $cardToken): array
     {
         InputValidator::nonEmptyString($cardToken, 'cardToken');
 

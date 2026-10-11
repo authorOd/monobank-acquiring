@@ -51,7 +51,7 @@ class MonoClient
      *                                          `cms_name` / `cms_version` keys (sent as X-Cms headers).
      */
     public function __construct(
-        string $apiKey,
+        #[\SensitiveParameter] string $apiKey,
         string $baseUrl = 'https://api.monobank.ua/api/merchant',
         ?HttpClientInterface $httpClient = null,
         array $httpOptions = [],
@@ -59,7 +59,7 @@ class MonoClient
         ?PublicKeyCacheInterface $publicKeyCache = null
     ) {
         InputValidator::nonEmptyString($apiKey, 'apiKey');
-        InputValidator::httpUrl($baseUrl, 'baseUrl');
+        InputValidator::secureBaseUrl($baseUrl, 'baseUrl');
 
         $this->apiKey = $apiKey;
         $this->baseUrl = rtrim($baseUrl, '/');

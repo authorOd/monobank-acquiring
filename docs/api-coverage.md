@@ -25,8 +25,8 @@ typed model or validation beyond what the API requires.
 | `DELETE /api/merchant/wallet/card` | `wallet()->deleteCard()` |
 | `POST /api/merchant/subscription/create` | `subscriptions()->createSubscription(SubscriptionData)` |
 | `GET /api/merchant/subscription/status` | `subscriptions()->getSubscriptionStatus()` |
-| `GET /api/merchant/subscription/payments` | `subscriptions()->getSubscriptionPayments()` |
-| `GET /api/merchant/subscription/list` | `subscriptions()->getSubscriptionList()` |
+| `GET /api/merchant/subscription/payments` | `subscriptions()->getSubscriptionPayments()` / `iterateSubscriptionPayments()` |
+| `GET /api/merchant/subscription/list` | `subscriptions()->getSubscriptionList()` / `iterateSubscriptionList()` |
 | `POST /api/merchant/subscription/remove` | `subscriptions()->removeSubscription()` |
 | `POST /api/merchant/subscription/edit` | `subscriptions()->editSubscription()` / `cancelSubscription()` |
 | Webhook signature verification (`X-Sign`) | `webhooks()->parseVerified()` and friends |

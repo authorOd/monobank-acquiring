@@ -69,8 +69,10 @@ class SensitiveData
      * @param string[] $additionalSafeHeaders
      * @return array<string, mixed>
      */
-    public static function sanitizeHeaders(array $headers, array $additionalSafeHeaders = []): array
-    {
+    public static function sanitizeHeaders(
+        #[\SensitiveParameter] array $headers,
+        array $additionalSafeHeaders = []
+    ): array {
         $sanitized = [];
         $safeHeaderKeys = self::safeHeaderKeys($additionalSafeHeaders);
 

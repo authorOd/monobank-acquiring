@@ -63,7 +63,7 @@ final class TransactionalWebhookProcessor
      * @throws \Vladchornyi\Mono\Exceptions\MonoWebhookException when the signature or payload is invalid (respond 400)
      * @throws Throwable on unexpected storage failures (respond 500; Monobank retries)
      */
-    public function handle(string $rawBody, ?string $xSign): string
+    public function handle(#[\SensitiveParameter] string $rawBody, #[\SensitiveParameter] ?string $xSign): string
     {
         // Verification is CPU-only and happens outside the transaction.
         $event = $this->webhooks->parseVerifiedPayload($rawBody, $xSign, $this->trustedPublicKey);
@@ -99,7 +99,7 @@ final class TransactionalWebhookProcessor
         }
     }
 
-    private function process(WebhookPayload $event, string $rawBody): string
+    private function process(WebhookPayload $event, #[\SensitiveParameter] string $rawBody): string
     {
         $entityKey = $event->entityKey();
         $deduplicationKey = $event->deduplicationKey();
@@ -228,8 +228,12 @@ final class TransactionalWebhookProcessor
      * timestamp that protects against stale deliveries. Tokenization state
      * lives in its own columns so it never competes with the payment status.
      */
-    private function upsertEntity(string $entityKey, WebhookPayload $event, string $rawBody, bool $exists): void
-    {
+    private function upsertEntity(
+        string $entityKey,
+        WebhookPayload $event,
+        #[\SensitiveParameter] string $rawBody,
+        bool $exists
+    ): void {
         $columns = [
             'last_payload' => json_encode($event->safeArray(), JSON_UNESCAPED_UNICODE),
             'updated_at' => $this->now(),

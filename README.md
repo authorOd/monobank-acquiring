@@ -13,7 +13,8 @@ merchant details, webhook signature verification, and structured error handling.
 
 - Invoices: create, status, cancel, invalidate, hold finalization, receipts, and
   fiscal checks.
-- Subscriptions: create, status, list, payment history, cancel with refund, remove.
+- Subscriptions: create, status, list, payment history, page iterators, cancel
+  with refund, remove.
 - Tokenized cards: wallet listing, payment by card token, card deletion.
 - Statements, merchant details, submerchants, and split receivers.
 - Verified webhook parsing with `X-Sign` support.
@@ -22,7 +23,8 @@ merchant details, webhook signature verification, and structured error handling.
 - Rotation-aware public-key verification with injectable shared caching.
 - Replaceable HTTP layer for tests and framework integrations.
 - Response-header capture and safe retry handling for idempotent requests.
-- Structured exceptions and safe logging helpers.
+- Structured exceptions, safe logging helpers, and secrets hidden from exception
+  traces on PHP 8.2+.
 
 Version 2.0 contains intentional breaking changes. Existing 1.x applications
 should follow the [upgrade guide](UPGRADING.md) before changing the constraint.
@@ -38,7 +40,7 @@ should follow the [upgrade guide](UPGRADING.md) before changing the constraint.
 ## Installation
 
 ```bash
-composer require vladchornyi/mono:^2.0
+composer require vladchornyi/mono:^2.1
 ```
 
 ## Quick Start
@@ -104,7 +106,8 @@ includes four release-gate suites, also runnable alone with
   the specification's examples must be readable by the SDK.
 - `tests/Migration`: real 1.x call forms executed against 2.0, the evidence
   behind `UPGRADING.md`.
-- `tests/Regression`: one reproduction per defect found during the 2.0 review.
+- `tests/Regression`: one reproduction per defect found during the 2.0 and 2.1
+  reviews.
 - `tests/Docs`: every PHP block in the docs compiles, every documented client
   call exists, and `docs/api-coverage.md` lists every specification endpoint.
 

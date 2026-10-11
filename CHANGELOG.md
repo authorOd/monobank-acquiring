@@ -1,5 +1,53 @@
 # Changelog
 
+## 2.1.0 - 2026-10-12
+
+### Security
+
+- Mark every parameter that receives the merchant token, request URL or headers,
+  card token, wallet id, e-mail, or raw webhook body as `#[\SensitiveParameter]`,
+  so PHP 8.2+ keeps these values out of exception traces and error trackers.
+- Require HTTPS for the API `baseUrl`; plain HTTP is accepted only for loopback
+  hosts, so a misconfigured URL can no longer send `X-Token` in clear text.
+- Redact completed outbox jobs in the webhook example so card tokens and wallet
+  ids do not stay in `webhook_outbox`.
+- Keep the webhook demo database out of the example directory: `bootstrap.php`
+  reads `MONO_WEBHOOK_DSN` and defaults to the system temp directory.
+- Pin GitHub Actions to commit SHAs and let Dependabot update them.
+
+### Added
+
+- `MonoPublicKeyUnavailableException` (extends `MonoWebhookException`) for a
+  webhook whose signature could not be checked because no validated public key
+  was available.
+- `SubscriptionService::iterateSubscriptionList()` and
+  `iterateSubscriptionPayments()` walk every page lazily and treat a missing
+  `list` as an empty page.
+- `InputValidator::secureBaseUrl()`.
+- `examples/Webhooks/migrate.php` and `examples/Webhooks/bootstrap.php`.
+
+### Fixed
+
+- Genuine webhooks were answered with 400 when the shared cache was down or a
+  key refresh was rate limited, because those cases threw the same exception as
+  a forged signature. They now throw `MonoPublicKeyUnavailableException`, and
+  the docs and example answer 503 and log the cause.
+- A shared-cache outage no longer registers a process-local refresh guard that
+  made every later verification sleep while polling, and its error message no
+  longer claims a rate limit.
+- `CurlHttpClient::__destruct()` no longer calls `curl_close()`, which emits a
+  deprecation on PHP 8.5 and has been a no-op since PHP 8.0.
+- The webhook example logs rejected deliveries, answers 503 without `MONO_KEY`,
+  and no longer runs the schema on every request.
+
+### Changed
+
+- **Behavior change:** `MonoClient` and services throw
+  `InvalidArgumentException` for a plain-HTTP `baseUrl` on a non-loopback host.
+  The default Monobank URL is HTTPS and unaffected.
+- The Composer package no longer ships `tests/`, `phpunit.xml.dist`,
+  `phpcs.xml`, `phpstan.neon`, `.gitattributes`, or `.gitignore`.
+
 ## 2.0.0 - 2026-09-06
 
 ### Breaking

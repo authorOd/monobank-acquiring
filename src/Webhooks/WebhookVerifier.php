@@ -8,8 +8,11 @@ class WebhookVerifier
 {
     private const MAX_SIGNATURE_BYTES = 144;
 
-    public function verify(string $payload, string $xSignBase64, string $publicKeyBase64): bool
-    {
+    public function verify(
+        #[\SensitiveParameter] string $payload,
+        #[\SensitiveParameter] string $xSignBase64,
+        string $publicKeyBase64
+    ): bool {
         $this->assertPayload($payload);
         $signature = $this->decodeSignature($xSignBase64);
         $publicKey = $this->decodePublicKey($publicKeyBase64);
@@ -23,14 +26,14 @@ class WebhookVerifier
         return $result === 1;
     }
 
-    public function assertPayload(string $payload): void
+    public function assertPayload(#[\SensitiveParameter] string $payload): void
     {
         if ($payload === '') {
             throw new MonoWebhookException('Webhook payload is empty.');
         }
     }
 
-    public function assertSignature(string $xSignBase64): void
+    public function assertSignature(#[\SensitiveParameter] string $xSignBase64): void
     {
         $this->decodeSignature($xSignBase64);
     }
@@ -49,7 +52,7 @@ class WebhookVerifier
         }
     }
 
-    private function decodeSignature(string $xSignBase64): string
+    private function decodeSignature(#[\SensitiveParameter] string $xSignBase64): string
     {
         if ($xSignBase64 === '') {
             throw new MonoWebhookException('Webhook signature is missing.');

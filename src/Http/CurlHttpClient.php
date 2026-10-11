@@ -81,8 +81,12 @@ class CurlHttpClient implements HttpClientInterface
         }
     }
 
-    public function send(string $method, string $url, array $headers = [], ?array $body = null): HttpResponse
-    {
+    public function send(
+        string $method,
+        #[\SensitiveParameter] string $url,
+        #[\SensitiveParameter] array $headers = [],
+        #[\SensitiveParameter] ?array $body = null
+    ): HttpResponse {
         InputValidator::httpUrl($url, 'url');
 
         $method = $this->normalizeMethod($method);
@@ -116,18 +120,26 @@ class CurlHttpClient implements HttpClientInterface
         }
     }
 
+    /**
+     * Releases the reused cURL handle. Since PHP 8.0 a CurlHandle is freed when
+     * its last reference goes away; `curl_close()` is a no-op that PHP 8.5
+     * deprecates, so it is not called. The method stays for subclasses that
+     * call `parent::__destruct()`.
+     */
     public function __destruct()
     {
-        if ($this->handle !== null) {
-            curl_close($this->handle);
-        }
+        $this->handle = null;
     }
 
     /**
      * @param array<string, string> $headers
      */
-    protected function execute(string $method, string $url, array $headers, ?string $json): HttpResponse
-    {
+    protected function execute(
+        string $method,
+        #[\SensitiveParameter] string $url,
+        #[\SensitiveParameter] array $headers,
+        #[\SensitiveParameter] ?string $json
+    ): HttpResponse {
         if ($this->handle === null) {
             $handle = curl_init();
 
@@ -218,7 +230,7 @@ class CurlHttpClient implements HttpClientInterface
     /**
      * @param array<array-key, mixed>|null $body
      */
-    protected function encodeBody(?array $body): ?string
+    protected function encodeBody(#[\SensitiveParameter] ?array $body): ?string
     {
         if ($body === null) {
             return null;
@@ -238,7 +250,7 @@ class CurlHttpClient implements HttpClientInterface
      * @param array<array-key, mixed> $headers
      * @return string[]
      */
-    protected function normalizeHeaders(array $headers): array
+    protected function normalizeHeaders(#[\SensitiveParameter] array $headers): array
     {
         $normalized = [];
 

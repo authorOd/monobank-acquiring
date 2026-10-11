@@ -274,6 +274,25 @@ final class OpenApiContractTest extends TestCase
                 'GET',
                 '/api/merchant/subscription/list',
             ],
+            'subscription payments iterator' => [
+                static fn (MonoClient $m) => iterator_to_array($m->subscriptions()->iterateSubscriptionPayments(
+                    's1',
+                    '2026-07-01T10:00:00+03:00',
+                    '2026-07-02T10:00:00+03:00',
+                    50
+                )),
+                'GET',
+                '/api/merchant/subscription/payments',
+            ],
+            'subscription list iterator' => [
+                static fn (MonoClient $m) => iterator_to_array($m->subscriptions()->iterateSubscriptionList(
+                    '2026-07-01T10:00:00+03:00',
+                    status: 'active',
+                    limit: 50
+                )),
+                'GET',
+                '/api/merchant/subscription/list',
+            ],
             'subscription remove' => [
                 static fn (MonoClient $m) => $m->subscriptions()->removeSubscription('s1'),
                 'POST',

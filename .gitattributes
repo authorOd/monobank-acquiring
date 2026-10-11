@@ -1,6 +1,12 @@
+/.gitattributes export-ignore
 /.github export-ignore
+/.gitignore export-ignore
 /.idea export-ignore
 /build export-ignore
 /composer.lock export-ignore
+/phpcs.xml export-ignore
+/phpstan.neon export-ignore
+/phpunit.xml.dist export-ignore
 /test.php export-ignore
+/tests export-ignore
 /vendor export-ignore

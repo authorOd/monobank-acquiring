@@ -41,6 +41,7 @@ Monobank POSTs the invoice status to `webHookUrl` on every change except
 it. `MonoClient::webhooks()` fetches and caches the public key for you.
 
 ```php
+use Vladchornyi\Mono\Exceptions\MonoPublicKeyUnavailableException;
 use Vladchornyi\Mono\Exceptions\MonoWebhookException;
 
 $rawBody = file_get_contents('php://input');
@@ -48,6 +49,10 @@ $xSign = $_SERVER['HTTP_X_SIGN'] ?? null;
 
 try {
     $event = $mono->webhooks()->parseVerifiedPayload($rawBody, $xSign);
+} catch (MonoPublicKeyUnavailableException $e) {
+    error_log('Monobank webhook deferred: ' . $e->getMessage());
+    http_response_code(503);                                // key temporarily unavailable: retry
+    exit;
 } catch (MonoWebhookException $e) {
     http_response_code(400);                                // bad signature: do not retry
     exit;
@@ -76,6 +81,11 @@ if ($event->modifiedInstant() !== null) {
 
 http_response_code(200);
 ```
+
+Catch `MonoPublicKeyUnavailableException` before its parent
+`MonoWebhookException`. It means the signature could not be checked yet because
+the Monobank public key was temporarily unavailable, so the delivery must be
+retried rather than rejected.
 
 Three rules keep this correct: apply each `deduplicationKey()` once, persist the
 state change before responding 200, and only write fields the event actually

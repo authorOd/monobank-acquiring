@@ -4,6 +4,8 @@ namespace Vladchornyi\Mono\Tests\Regression;
 
 use PHPUnit\Framework\TestCase;
 use Vladchornyi\Mono\Exceptions\MonoApiException;
+use Vladchornyi\Mono\Exceptions\MonoPublicKeyUnavailableException;
+use Vladchornyi\Mono\Http\CurlHttpClient;
 use Vladchornyi\Mono\Http\HttpResponse;
 use Vladchornyi\Mono\Models\BasketOrderItem;
 use Vladchornyi\Mono\Models\DiscountItem;
@@ -19,8 +21,8 @@ use Vladchornyi\Mono\Webhooks\WebhookPayload;
 use Vladchornyi\Mono\Webhooks\WebhookVerifier;
 
 /**
- * One test per defect that was reproduced during the 2.0 review. Test names
- * describe the defect; each test is the minimal reproduction and must keep
+ * One test per defect that was reproduced during the 2.0 and 2.1 reviews. Test
+ * names describe the defect; each test is the minimal reproduction and must keep
  * failing if the fix regresses.
  */
 final class ReproducedDefectsTest extends TestCase
@@ -183,6 +185,107 @@ final class ReproducedDefectsTest extends TestCase
     public function testEventKeyRemovalBrokeOneXHandlers(): void
     {
         self::assertSame('invoice:p2_1', @WebhookPayload::fromArray(['invoiceId' => 'p2_1'])->eventKey());
+    }
+
+    public function testGenuineWebhookLookedForgedWhileThePublicKeyWasUnavailable(): void
+    {
+        $this->requireOpenSsl();
+        [$privateKey] = EcdsaKeys::pair();
+        $body = '{"invoiceId":"p2_1","status":"success"}';
+        $xSign = EcdsaKeys::sign($body, $privateKey);
+        $webhooks = (new MonoClient('token', self::BASE, new FakeHttpClient(
+            new HttpResponse(503, '{"errCode":"TEMPORARY"}')
+        ), publicKeyCache: new ArrayPublicKeyCache()))->webhooks();
+
+        try {
+            $webhooks->verify($body, $xSign);
+        } catch (MonoApiException $exception) {
+            // The first /pubkey call failed; the refresh cooldown is now active.
+        }
+
+        $this->expectException(MonoPublicKeyUnavailableException::class);
+        $webhooks->verify($body, $xSign);
+    }
+
+    public function testMerchantTokenLeakedIntoExceptionTraceArguments(): void
+    {
+        $previous = ini_set('zend.exception_ignore_args', '0');
+
+        try {
+            new MonoClient('uSECRET-token-value', 'ftp://api.monobank.ua');
+            self::fail('An invalid base URL was accepted.');
+        } catch (\InvalidArgumentException $exception) {
+            $arguments = json_encode(array_column($exception->getTrace(), 'args'), JSON_PARTIAL_OUTPUT_ON_ERROR);
+        } finally {
+            if ($previous !== false) {
+                ini_set('zend.exception_ignore_args', $previous);
+            }
+        }
+
+        if (PHP_VERSION_ID < 80200) {
+            $attributes = (new \ReflectionParameter([MonoClient::class, '__construct'], 'apiKey'))->getAttributes();
+            self::assertSame('SensitiveParameter', $attributes[0]->getName());
+
+            return;
+        }
+
+        self::assertStringNotContainsString('uSECRET-token-value', (string) $arguments);
+    }
+
+    public function testDestroyingAUsedCurlClientCalledTheDeprecatedCurlClose(): void
+    {
+        if (!extension_loaded('curl')) {
+            self::assertFalse(function_exists('curl_init'));
+            return;
+        }
+
+        $client = new CurlHttpClient(['connect_timeout' => 1, 'timeout' => 1, 'max_retries' => 0]);
+
+        try {
+            $client->send('GET', 'http://127.0.0.1:1');   // initializes the reused handle, then fails
+        } catch (\Vladchornyi\Mono\Exceptions\MonoTransportException $exception) {
+            // Expected: nothing listens on port 1.
+        }
+
+        $notices = [];
+        set_error_handler(static function (int $level, string $message) use (&$notices): bool {
+            $notices[] = $message;
+
+            return true;
+        });
+
+        try {
+            $client->__destruct();
+        } finally {
+            restore_error_handler();
+        }
+
+        self::assertSame([], $notices);
+    }
+
+    public function testPlainHttpBaseUrlWouldSendTheTokenInClearText(): void
+    {
+        $http = new FakeHttpClient();
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('must use HTTPS');
+
+        try {
+            (new MonoClient('token', 'http://api.example.test/api/merchant', $http))->merchant()->getDetails();
+        } finally {
+            self::assertCount(0, $http->requests);
+        }
+    }
+
+    public function testSubscriptionListWithoutTheOptionalListFieldBrokeIteration(): void
+    {
+        $http = new FakeHttpClient(new HttpResponse(200, '{"pagination":{"totalItems":0,"totalPages":0}}'));
+        $client = new MonoClient('token', self::BASE, $http);
+
+        self::assertSame(
+            [],
+            iterator_to_array($client->subscriptions()->iterateSubscriptionList('2026-07-01T10:00:00Z'), false)
+        );
     }
 
     private function requireOpenSsl(): void

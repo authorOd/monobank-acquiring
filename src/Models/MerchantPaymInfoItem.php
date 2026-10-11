@@ -32,7 +32,7 @@ class MerchantPaymInfoItem
         ?string $reference = null,
         ?string $destination = null,
         ?string $comment = null,
-        ?array $customerEmails = null,
+        #[\SensitiveParameter] ?array $customerEmails = null,
         ?array $discounts = null,
         ?array $basketOrder = null,
         ?array $metadata = null

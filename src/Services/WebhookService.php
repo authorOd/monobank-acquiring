@@ -79,8 +79,11 @@ class WebhookService
         return $this->requirePublicKeyProvider()->refreshPublicKey();
     }
 
-    public function verify(string $payload, ?string $xSignBase64, ?string $publicKeyBase64 = null): bool
-    {
+    public function verify(
+        #[\SensitiveParameter] string $payload,
+        #[\SensitiveParameter] ?string $xSignBase64,
+        ?string $publicKeyBase64 = null
+    ): bool {
         if ($xSignBase64 === null || $xSignBase64 === '') {
             throw new MonoWebhookException('Webhook signature is missing.');
         }
@@ -114,7 +117,7 @@ class WebhookService
     /**
      * @return array<string, mixed>
      */
-    public function parse(string $payload): array
+    public function parse(#[\SensitiveParameter] string $payload): array
     {
         $trimmedPayload = ltrim($payload);
 
@@ -138,8 +141,11 @@ class WebhookService
     /**
      * @return array<string, mixed>
      */
-    public function parseVerified(string $payload, ?string $xSignBase64, ?string $publicKeyBase64 = null): array
-    {
+    public function parseVerified(
+        #[\SensitiveParameter] string $payload,
+        #[\SensitiveParameter] ?string $xSignBase64,
+        ?string $publicKeyBase64 = null
+    ): array {
         if (!$this->verify($payload, $xSignBase64, $publicKeyBase64)) {
             throw new MonoWebhookException('Webhook signature is invalid.');
         }
@@ -150,19 +156,19 @@ class WebhookService
     /**
      * @param array<string, mixed> $payload
      */
-    public function payload(array $payload): WebhookPayload
+    public function payload(#[\SensitiveParameter] array $payload): WebhookPayload
     {
         return WebhookPayload::fromArray($payload);
     }
 
-    public function parsePayload(string $payload): WebhookPayload
+    public function parsePayload(#[\SensitiveParameter] string $payload): WebhookPayload
     {
         return $this->payload($this->parse($payload));
     }
 
     public function parseVerifiedPayload(
-        string $payload,
-        ?string $xSignBase64,
+        #[\SensitiveParameter] string $payload,
+        #[\SensitiveParameter] ?string $xSignBase64,
         ?string $publicKeyBase64 = null
     ): WebhookPayload {
         return $this->payload($this->parseVerified($payload, $xSignBase64, $publicKeyBase64));
@@ -185,7 +191,7 @@ class WebhookService
      * @param DateTimeInterface|Instant|string|null $storedModifiedDate
      */
     public function shouldApply(
-        array $payload,
+        #[\SensitiveParameter] array $payload,
         $storedModifiedDate = null,
         bool $allowMissingModifiedDate = true
     ): bool {
@@ -225,7 +231,7 @@ class WebhookService
      *
      * @param array<string, mixed> $payload
      */
-    public function getModifiedInstant(array $payload): ?Instant
+    public function getModifiedInstant(#[\SensitiveParameter] array $payload): ?Instant
     {
         $value = $payload['modifiedDate'] ?? null;
 
@@ -249,7 +255,7 @@ class WebhookService
     /**
      * @param array<string, mixed> $payload
      */
-    public function getModifiedDate(array $payload): ?DateTimeImmutable
+    public function getModifiedDate(#[\SensitiveParameter] array $payload): ?DateTimeImmutable
     {
         return $this->getModifiedInstant($payload)?->toDateTimeImmutable();
     }

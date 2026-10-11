@@ -4,6 +4,7 @@ namespace Vladchornyi\Mono\Examples\Webhooks;
 
 use PDO;
 use Throwable;
+use Vladchornyi\Mono\Support\SensitiveData;
 
 /**
  * Executes outbox jobs written by TransactionalWebhookProcessor.
@@ -20,6 +21,9 @@ use Throwable;
  *   worker loses that right when another worker takes over its expired lease.
  * - Delivery is at-least-once. Dispatchers must be idempotent and should pass
  *   `idempotency_key` (the webhook deduplication key) to external systems.
+ * - A completed job keeps only a redacted payload: card tokens, wallet ids,
+ *   and other values SensitiveData treats as secret are removed once the
+ *   dispatcher succeeded, so the outbox does not retain them indefinitely.
  *
  * A job that exhausted `maxAttempts` keeps blocking later jobs of its entity
  * on purpose: skipping it would execute effects out of order. Find such jobs
@@ -89,13 +93,15 @@ final class OutboxWorker
                     continue;
                 }
 
+                $payload = (array) json_decode((string) $job['payload'], true);
+
                 try {
                     ($this->dispatcher)([
                         'id' => (int) $job['id'],
                         'idempotency_key' => $job['idempotency_key'],
                         'entity_key' => $job['entity_key'],
                         'job_type' => $job['job_type'],
-                        'payload' => (array) json_decode((string) $job['payload'], true),
+                        'payload' => $payload,
                         'attempts' => (int) $job['attempts'],
                     ]);
                 } catch (Throwable $exception) {
@@ -103,7 +109,7 @@ final class OutboxWorker
                     continue; // stays leased until leased_until, then retries in order
                 }
 
-                if ($this->markDone((int) $job['id'], $owner)) {
+                if ($this->markDone((int) $job['id'], $owner, $payload)) {
                     ++$completed;
                 }
                 // Otherwise another worker took over the expired lease.
@@ -188,19 +194,35 @@ final class OutboxWorker
         return is_array($row) ? $row : null;
     }
 
-    private function markDone(int $id, string $owner): bool
+    /**
+     * @param array<array-key, mixed> $payload
+     */
+    private function markDone(int $id, string $owner, #[\SensitiveParameter] array $payload): bool
     {
         $statement = $this->pdo->prepare(
-            'UPDATE webhook_outbox SET done_at = :now, last_error = NULL '
+            'UPDATE webhook_outbox SET done_at = :now, last_error = NULL, payload = :payload '
             . 'WHERE id = :id AND lease_owner = :owner AND done_at IS NULL'
         );
         $statement->execute([
             ':now' => (new \DateTimeImmutable('@' . ($this->clock)()))->format(DATE_RFC3339_EXTENDED),
+            ':payload' => $this->redact($payload),
             ':id' => $id,
             ':owner' => $owner,
         ]);
 
         return $statement->rowCount() === 1;
+    }
+
+    /**
+     * @param array<array-key, mixed> $payload
+     */
+    private function redact(#[\SensitiveParameter] array $payload): string
+    {
+        $redacted = SensitiveData::sanitize($payload);
+
+        return is_array($redacted) && $redacted !== []
+            ? json_encode($redacted, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
+            : '{}';
     }
 
     private function recordFailure(int $id, string $owner, Throwable $exception): void

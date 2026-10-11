@@ -23,7 +23,7 @@ class WalletPaymentData
     protected ?string $paymentType;
 
     public function __construct(
-        string $cardToken,
+        #[\SensitiveParameter] string $cardToken,
         int $amount,
         int $ccy,
         string $initiationKind,

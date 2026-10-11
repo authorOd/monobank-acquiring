@@ -14,16 +14,32 @@ per process; that fallback is fine for a single worker but cannot coordinate
 Configure a shared cache for production (see below).
 
 ```php
+use Vladchornyi\Mono\Exceptions\MonoPublicKeyUnavailableException;
+use Vladchornyi\Mono\Exceptions\MonoWebhookException;
+
 $rawBody = file_get_contents('php://input');
 $xSign = $_SERVER['HTTP_X_SIGN'] ?? null;
 
 try {
     $payload = $mono->webhooks()->parseVerified($rawBody, $xSign);
-} catch (\Vladchornyi\Mono\Exceptions\MonoWebhookException $e) {
-    http_response_code(400);
+} catch (MonoPublicKeyUnavailableException $e) {
+    error_log('Monobank webhook deferred: ' . $e->getMessage());
+    http_response_code(503);   // signature not checked yet: let Monobank retry
+    exit;
+} catch (MonoWebhookException $e) {
+    http_response_code(400);   // forged or malformed: do not retry
     exit;
 }
 ```
+
+`MonoPublicKeyUnavailableException` extends `MonoWebhookException`, so catch it
+first. It is thrown when the SDK cannot obtain a validated public key and has no
+cached one: the shared cache is down, a refresh is rate limited or still running
+in another worker, or `/pubkey` returned no usable key. The request was not
+proven forged, so answer with a retryable status and alert on it. Before 2.1 these
+cases surfaced as a plain `MonoWebhookException`, and the handler above answered
+400 to genuine payments. Transport and API failures while fetching the key still
+surface as `MonoTransportException` and `MonoApiException`; treat them as 5xx.
 
 If your application already distributes a trusted Monobank public key, pass it as
 the third argument. This path needs neither a cache nor a provider and never
@@ -263,8 +279,9 @@ $mono = new MonoClient(
 
 The standard provider derives its default logical key from the API base URL and a
 one-way merchant-token fingerprint. If the shared cache is unavailable, it uses a
-validated local or stale record when allowed and otherwise fails closed; it never
-issues an uncoordinated `/pubkey` request.
+validated local or stale record when allowed and otherwise fails closed with
+`MonoPublicKeyUnavailableException`; it never issues an uncoordinated `/pubkey`
+request and does not make later calls wait for a refresh that cannot happen.
 
 When implementing `PublicKeyCacheInterface`, throw `Exception` for operational
 backend failures (for example connectivity, timeouts, or I/O errors). The SDK's
@@ -364,13 +381,30 @@ need explicit migrations for missing columns/indexes.
 
 ```php
 use App\Payments\Monobank\TransactionalWebhookProcessor;
+use Vladchornyi\Mono\Exceptions\MonoPublicKeyUnavailableException;
+use Vladchornyi\Mono\Exceptions\MonoWebhookException;
 
 $processor = new TransactionalWebhookProcessor($pdo, $mono->webhooks());
-$outcome = $processor->handle($rawBody, $xSign);     // applied | duplicate | stale | retry
+
+try {
+    $outcome = $processor->handle($rawBody, $xSign);  // applied | duplicate | stale | retry
+} catch (MonoPublicKeyUnavailableException $e) {
+    $outcome = TransactionalWebhookProcessor::OUTCOME_RETRY;
+} catch (MonoWebhookException $e) {
+    http_response_code(400);
+    exit;
+}
+
 http_response_code($outcome === TransactionalWebhookProcessor::OUTCOME_RETRY ? 503 : 200);
 ```
 
-`tests/Integration/TransactionalWebhookProcessorTest.php` proves the guarantees
+Completed outbox jobs keep only a redacted payload, so card tokens and wallet ids
+do not stay in `webhook_outbox` after the dispatcher has handled them. The
+stand-alone demo reads its database from `MONO_WEBHOOK_DSN` (never a file next to
+`index.php`) and creates the tables once with `php examples/Webhooks/migrate.php`.
+
+`tests/Integration/TransactionalWebhookProcessorTest.php` in the library
+repository (tests are not part of the Composer package) proves the guarantees
 on SQLite: out-of-order and repeated deliveries change state exactly once, a
 crash between the key write and the state change leaves nothing behind so the
 redelivery is applied, two concurrent deliveries serialize on the entity lock,

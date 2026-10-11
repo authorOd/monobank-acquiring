@@ -52,6 +52,63 @@ final class SupportValidationTest extends TestCase
         ];
     }
 
+    /**
+     * @dataProvider secureBaseUrlProvider
+     */
+    public function testBaseUrlRequiresHttpsExceptForLoopbackHosts(string $baseUrl, bool $accepted): void
+    {
+        try {
+            InputValidator::secureBaseUrl($baseUrl, 'baseUrl');
+            $result = true;
+        } catch (InvalidArgumentException $exception) {
+            self::assertStringContainsString('baseUrl', $exception->getMessage());
+            $result = false;
+        }
+
+        self::assertSame($accepted, $result, $baseUrl);
+    }
+
+    /** @return array<string, array{string, bool}> */
+    public function secureBaseUrlProvider(): array
+    {
+        return [
+            'production https' => ['https://api.monobank.ua/api/merchant', true],
+            'uppercase https scheme' => ['HTTPS://api.monobank.ua/api/merchant', true],
+            'loopback ipv4' => ['http://127.0.0.1:8080/api/merchant', true],
+            'loopback ipv4 range' => ['http://127.10.20.30', true],
+            'localhost' => ['http://localhost:8080', true],
+            'uppercase localhost' => ['http://LOCALHOST', true],
+            'loopback ipv6' => ['http://[::1]:8080', true],
+            'plain http remote' => ['http://api.monobank.ua/api/merchant', false],
+            'plain http private network' => ['http://10.0.0.5/api/merchant', false],
+            'localhost suffix' => ['http://localhost.attacker.example', false],
+            'loopback-looking hostname' => ['http://127.0.0.1.attacker.example', false],
+            'unspecified ipv4' => ['http://0.0.0.0', false],
+            'non-http scheme' => ['ftp://api.monobank.ua', false],
+        ];
+    }
+
+    public function testClientAndServicesRejectAPlainHttpBaseUrl(): void
+    {
+        foreach (
+            [
+                static fn () => new \Vladchornyi\Mono\MonoClient('token', 'http://api.monobank.ua/api/merchant'),
+                static fn () => new \Vladchornyi\Mono\Services\MerchantService(
+                    'token',
+                    'http://api.monobank.ua/api/merchant',
+                    new \Vladchornyi\Mono\Tests\Support\FakeHttpClient()
+                ),
+            ] as $construct
+        ) {
+            try {
+                $construct();
+                self::fail('A plain HTTP base URL was accepted.');
+            } catch (InvalidArgumentException $exception) {
+                self::assertStringContainsString('must use HTTPS', $exception->getMessage());
+            }
+        }
+    }
+
     public function testRfc3339PreservesSupportedFractionPrecision(): void
     {
         $date = Rfc3339::parse('2026-07-01T10:00:00.1234+03:00');

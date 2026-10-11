@@ -89,6 +89,31 @@ final class CurlHttpClientTest extends TestCase
         self::assertSame('local-integration-test', $response->getHeaderLine('x-request-id'));
     }
 
+    public function testDestroyingAUsedClientEmitsNoDeprecation(): void
+    {
+        $client = new CurlHttpClient(['max_retries' => 0]);
+        $client->send('GET', 'http://127.0.0.1:' . $this->port);
+        $client->send('GET', 'http://127.0.0.1:' . $this->port);
+        $notices = [];
+
+        set_error_handler(static function (int $level, string $message) use (&$notices): bool {
+            $notices[] = $message;
+
+            return true;
+        });
+
+        try {
+            // PHP 8.5 deprecates curl_close(); the destructor must not call it.
+            $client->__destruct();
+            unset($client);
+            gc_collect_cycles();
+        } finally {
+            restore_error_handler();
+        }
+
+        self::assertSame([], $notices);
+    }
+
     public function testDefaultTransportRejectsMalformedHeaderMaps(): void
     {
         $client = new CurlHttpClient(['max_retries' => 0]);

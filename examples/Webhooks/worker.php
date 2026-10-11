@@ -3,6 +3,7 @@
 /**
  * Outbox worker: runs queued side effects after webhook transactions committed.
  *
+ *   php examples/Webhooks/migrate.php   # once: create the tables
  *   php examples/Webhooks/worker.php
  */
 
@@ -10,24 +11,8 @@ declare(strict_types=1);
 
 use Vladchornyi\Mono\Examples\Webhooks\OutboxWorker;
 
-// Works from the library checkout (examples/Webhooks) and from a copy inside an application.
-$autoload = null;
-for ($dir = __DIR__; $dir !== dirname($dir); $dir = dirname($dir)) {
-    if (is_file($dir . '/vendor/autoload.php')) {
-        $autoload = $dir . '/vendor/autoload.php';
-        break;
-    }
-}
-
-if ($autoload === null) {
-    fwrite(STDERR, "vendor/autoload.php not found above " . __DIR__ . "; run composer install\n");
-    exit(1);
-}
-
-require $autoload;
-
-$pdo = new PDO('sqlite:' . __DIR__ . '/webhooks.sqlite');
-$pdo->exec((string) file_get_contents(__DIR__ . '/schema.sql'));   // idempotent CREATE IF NOT EXISTS
+/** @var PDO $pdo */
+$pdo = require __DIR__ . '/bootstrap.php';   // tables come from migrate.php, not from every run
 
 $worker = new OutboxWorker($pdo, static function (array $job): void {
     // Use $job['idempotency_key'] as the idempotency key of every external call so a

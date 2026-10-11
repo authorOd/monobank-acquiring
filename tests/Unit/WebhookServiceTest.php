@@ -7,6 +7,7 @@ use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Vladchornyi\Mono\Contracts\PublicKeyCacheInterface;
 use Vladchornyi\Mono\Contracts\PublicKeyProviderInterface;
+use Vladchornyi\Mono\Exceptions\MonoPublicKeyUnavailableException;
 use Vladchornyi\Mono\Exceptions\MonoWebhookException;
 use Vladchornyi\Mono\Http\HttpResponse;
 use Vladchornyi\Mono\MonoClient;
@@ -202,9 +203,13 @@ final class WebhookServiceTest extends TestCase
         $client = new MonoClient('token', 'https://example.test/api/merchant', $http);
         $provider = new CachedPublicKeyProvider($client->pubkey(), cache: new ArrayPublicKeyCache());
 
-        $this->expectException(MonoWebhookException::class);
-        $this->expectExceptionMessage('EC public key');
-        $provider->getPublicKey();
+        try {
+            $provider->getPublicKey();
+            self::fail('A non-EC key from /pubkey was accepted.');
+        } catch (MonoPublicKeyUnavailableException $exception) {
+            self::assertStringContainsString('EC public key', $exception->getMessage());
+            self::assertInstanceOf(MonoWebhookException::class, $exception->getPrevious());
+        }
     }
 
     public function testCachedProviderRequiresAnExplicitCoordinationCache(): void
@@ -426,7 +431,7 @@ final class WebhookServiceTest extends TestCase
         $http = new FakeHttpClient(new HttpResponse(200, '{}'));
         $client = new MonoClient('token', 'https://example.test/api/merchant', $http);
 
-        $this->expectException(MonoWebhookException::class);
+        $this->expectException(MonoPublicKeyUnavailableException::class);
         $this->expectExceptionMessage('does not contain a key');
         (new CachedPublicKeyProvider($client->pubkey(), cache: new ArrayPublicKeyCache()))->getPublicKey();
     }
@@ -510,7 +515,7 @@ final class WebhookServiceTest extends TestCase
         try {
             $provider->getPublicKey();
             self::fail('A cold-cache worker bypassed the shared refresh cooldown.');
-        } catch (MonoWebhookException $exception) {
+        } catch (MonoPublicKeyUnavailableException $exception) {
             self::assertStringContainsString('rate limited', $exception->getMessage());
         }
 
@@ -533,14 +538,14 @@ final class WebhookServiceTest extends TestCase
         try {
             $provider->getPublicKey();
             self::fail('A cold-cache worker bypassed the shared in-flight lock.');
-        } catch (MonoWebhookException $exception) {
+        } catch (MonoPublicKeyUnavailableException $exception) {
             self::assertStringContainsString('in progress', $exception->getMessage());
         }
 
         self::assertCount(0, $http->requests);
     }
 
-    public function testCacheFailureFallsBackToProcessLocalRefreshCooldown(): void
+    public function testCacheOutageFailsClosedWithoutRegisteringAProcessLocalGuard(): void
     {
         [, $publicKey] = $this->keyPair();
         $cache = new class implements PublicKeyCacheInterface {
@@ -591,12 +596,62 @@ final class WebhookServiceTest extends TestCase
             try {
                 $provider->refreshPublicKey();
                 self::fail('A refresh bypassed an unavailable coordination cache.');
-            } catch (MonoWebhookException $exception) {
+            } catch (MonoPublicKeyUnavailableException $exception) {
+                self::assertStringContainsString('cache is unavailable', $exception->getMessage());
                 self::assertStringContainsString('no cached key', $exception->getMessage());
             }
+
+            // A leftover local guard would make every later call poll and sleep.
+            $this->assertProcessGuardMissing('cache-outage:refresh-lock');
         }
 
         self::assertCount(0, $http->requests);
+    }
+
+    public function testValidWebhookDuringKeyOutageIsReportedAsUnavailableNotAsForged(): void
+    {
+        [$privateKey] = $this->keyPair();
+        $payload = $this->payload();
+        $signature = $this->sign($payload, $privateKey);
+        $http = new FakeHttpClient(new HttpResponse(503, '{"errCode":"TEMPORARY"}'));
+        $webhooks = (new MonoClient(
+            'token',
+            'https://example.test/api/merchant',
+            $http,
+            publicKeyCache: new ArrayPublicKeyCache()
+        ))->webhooks();
+
+        try {
+            $webhooks->parseVerified($payload, $signature);
+            self::fail('The first delivery was verified without a key.');
+        } catch (\Vladchornyi\Mono\Exceptions\MonoApiException $exception) {
+            self::assertSame(503, $exception->getStatusCode());
+        }
+
+        try {
+            $webhooks->parseVerified($payload, $signature);
+            self::fail('The second delivery was verified without a key.');
+        } catch (MonoPublicKeyUnavailableException $exception) {
+            self::assertStringContainsString('rate limited', $exception->getMessage());
+        }
+
+        self::assertCount(1, $http->requests);
+    }
+
+    public function testForgedSignatureIsNotReportedAsKeyOutage(): void
+    {
+        [, $publicKey] = $this->keyPair();
+        [$otherPrivateKey] = $this->keyPair();
+        $payload = $this->payload();
+        $webhooks = WebhookService::create();
+
+        try {
+            $webhooks->parseVerified($payload, $this->sign($payload, $otherPrivateKey), $publicKey);
+            self::fail('A forged signature was accepted.');
+        } catch (MonoWebhookException $exception) {
+            self::assertNotInstanceOf(MonoPublicKeyUnavailableException::class, $exception);
+            self::assertStringContainsString('signature is invalid', $exception->getMessage());
+        }
     }
 
     public function testCacheGetTypeErrorBubblesFromLoadRecord(): void

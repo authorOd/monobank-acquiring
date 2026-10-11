@@ -150,6 +150,156 @@ final class ServicesTest extends TestCase
         self::assertCount(0, $http->requests);
     }
 
+    public function testSubscriptionListIteratorWalksEveryPageInOrder(): void
+    {
+        $http = new FakeHttpClient(
+            $this->page('list', ['s1', 's2'], 1, 3),
+            $this->page('list', ['s3', 's4'], 2, 3),
+            $this->page('list', ['s5'], 3, 3)
+        );
+        $client = new MonoClient('token', 'https://example.test/api/merchant', $http);
+
+        $subscriptions = $client->subscriptions()->iterateSubscriptionList(
+            '2026-07-01T10:00:00Z',
+            status: 'active',
+            limit: 2
+        );
+
+        self::assertCount(1, $http->requests, 'the first page is requested at the call');
+        self::assertSame(
+            ['s1', 's2', 's3', 's4', 's5'],
+            array_column(iterator_to_array($subscriptions, false), 'subscriptionId')
+        );
+        self::assertCount(3, $http->requests);
+
+        foreach ($http->requests as $index => $request) {
+            self::assertSame(
+                'https://example.test/api/merchant/subscription/list?dateFrom=2026-07-01T10%3A00%3A00Z'
+                    . '&status=active&limit=2&page=' . ($index + 1),
+                $request['url']
+            );
+        }
+    }
+
+    public function testSubscriptionPaymentsIteratorReadsThePaymentsField(): void
+    {
+        $http = new FakeHttpClient(
+            $this->page('payments', ['p1', 'p2'], 1, 2),
+            $this->page('payments', ['p3'], 2, 2)
+        );
+        $client = new MonoClient('token', 'https://example.test/api/merchant', $http);
+
+        $payments = $client->subscriptions()->iterateSubscriptionPayments('s2_1', '2026-07-01T10:00:00Z', limit: 2);
+
+        self::assertSame(['p1', 'p2', 'p3'], array_column(iterator_to_array($payments, false), 'subscriptionId'));
+        self::assertStringContainsString('subscriptionId=s2_1', $http->requests[1]['url']);
+        self::assertStringContainsString('page=2', $http->requests[1]['url']);
+    }
+
+    public function testIteratorTreatsAMissingListAsAnEmptyResult(): void
+    {
+        // `list` is optional in SubscriptionsListResponse; only `pagination` is required.
+        $http = new FakeHttpClient(new HttpResponse(200, json_encode([
+            'pagination' => ['totalItems' => 0, 'itemsPerPage' => 20, 'currentPage' => 1, 'totalPages' => 0],
+        ], JSON_THROW_ON_ERROR)));
+        $client = new MonoClient('token', 'https://example.test/api/merchant', $http);
+
+        self::assertSame(
+            [],
+            iterator_to_array($client->subscriptions()->iterateSubscriptionList('2026-07-01T10:00:00Z'), false)
+        );
+        self::assertCount(1, $http->requests);
+    }
+
+    public function testIteratorWithoutAPageCountStopsAtTheFirstShortPage(): void
+    {
+        $http = new FakeHttpClient(
+            new HttpResponse(200, json_encode(['list' => [['subscriptionId' => 's1'], ['subscriptionId' => 's2']]])),
+            new HttpResponse(200, json_encode(['list' => [['subscriptionId' => 's3']]]))
+        );
+        $client = new MonoClient('token', 'https://example.test/api/merchant', $http);
+
+        $items = iterator_to_array(
+            $client->subscriptions()->iterateSubscriptionList('2026-07-01T10:00:00Z', limit: 2),
+            false
+        );
+
+        self::assertSame(['s1', 's2', 's3'], array_column($items, 'subscriptionId'));
+        self::assertCount(2, $http->requests);
+    }
+
+    public function testIteratorStopsAServerThatNeverRunsOutOfPages(): void
+    {
+        $http = new class implements \Vladchornyi\Mono\Contracts\HttpClientInterface {
+            public int $calls = 0;
+
+            public function send(string $method, string $url, array $headers = [], ?array $body = null): HttpResponse
+            {
+                ++$this->calls;
+
+                return new HttpResponse(200, json_encode([
+                    'list' => [['subscriptionId' => 'same']],
+                    'pagination' => ['totalPages' => PHP_INT_MAX],
+                ], JSON_THROW_ON_ERROR));
+            }
+        };
+        $client = new MonoClient('token', 'https://example.test/api/merchant', $http);
+
+        $seen = 0;
+
+        try {
+            foreach ($client->subscriptions()->iterateSubscriptionList('2026-07-01T10:00:00Z', limit: 1) as $item) {
+                $seen += $item['subscriptionId'] === 'same' ? 1 : 0;
+            }
+            self::fail('Pagination never stopped.');
+        } catch (\Vladchornyi\Mono\Exceptions\MonoException $exception) {
+            self::assertStringContainsString('did not finish after 1000 pages', $exception->getMessage());
+        }
+
+        self::assertSame(1000, $http->calls);
+        self::assertSame(1000, $seen);
+    }
+
+    public function testIteratorValidatesArgumentsAtTheCall(): void
+    {
+        $http = new FakeHttpClient();
+        $client = new MonoClient('token', 'https://example.test/api/merchant', $http);
+
+        try {
+            $client->subscriptions()->iterateSubscriptionList('2026-07-01T10:00:00Z', status: 'paused');
+            self::fail('An invalid status was accepted.');
+        } catch (InvalidArgumentException $exception) {
+            self::assertStringContainsString('status', $exception->getMessage());
+        }
+
+        self::assertCount(0, $http->requests);
+    }
+
+    public function testIteratorRejectsAMalformedItemList(): void
+    {
+        $http = new FakeHttpClient(new HttpResponse(200, '{"list":"not-a-list"}'));
+        $client = new MonoClient('token', 'https://example.test/api/merchant', $http);
+
+        $this->expectException(\Vladchornyi\Mono\Exceptions\MonoJsonException::class);
+        iterator_to_array($client->subscriptions()->iterateSubscriptionList('2026-07-01T10:00:00Z'));
+    }
+
+    /**
+     * @param string[] $ids
+     */
+    private function page(string $field, array $ids, int $currentPage, int $totalPages): HttpResponse
+    {
+        return new HttpResponse(200, json_encode([
+            $field => array_map(static fn (string $id): array => ['subscriptionId' => $id], $ids),
+            'pagination' => [
+                'totalItems' => 5,
+                'itemsPerPage' => 2,
+                'currentPage' => $currentPage,
+                'totalPages' => $totalPages,
+            ],
+        ], JSON_THROW_ON_ERROR));
+    }
+
     public function testFiscalizationItemsAreReindexedBeforeSending(): void
     {
         $http = new FakeHttpClient(new HttpResponse(200, '{}'), new HttpResponse(200, '{}'));

@@ -23,14 +23,14 @@ abstract class AbstractService
      * @param array<string, string> $defaultHeaders Extra headers sent with every request (e.g. X-Cms).
      */
     public function __construct(
-        string $apiKey,
+        #[\SensitiveParameter] string $apiKey,
         string $baseUrl,
         ?HttpClientInterface $httpClient = null,
         array $httpOptions = [],
         array $defaultHeaders = []
     ) {
         InputValidator::nonEmptyString($apiKey, 'apiKey');
-        InputValidator::httpUrl($baseUrl, 'baseUrl');
+        InputValidator::secureBaseUrl($baseUrl, 'baseUrl');
 
         foreach ($defaultHeaders as $name => $value) {
             if (!is_string($name) || trim($name) === '' || !is_string($value)) {
@@ -51,8 +51,12 @@ abstract class AbstractService
      * @param array<string, mixed> $query
      * @return array<array-key, mixed>
      */
-    protected function sendRequest(string $method, string $endpoint = '', ?array $data = null, array $query = []): array
-    {
+    protected function sendRequest(
+        string $method,
+        string $endpoint = '',
+        #[\SensitiveParameter] ?array $data = null,
+        #[\SensitiveParameter] array $query = []
+    ): array {
         $url = $this->buildUrl($endpoint, $query);
         $method = strtoupper($method);
         $payload = $data === null
@@ -103,7 +107,7 @@ abstract class AbstractService
     /**
      * @param array<string, mixed> $query
      */
-    protected function buildUrl(string $endpoint = '', array $query = []): string
+    protected function buildUrl(string $endpoint = '', #[\SensitiveParameter] array $query = []): string
     {
         $url = $this->baseUrl . $endpoint;
         $query = array_filter($query, static fn($value) => $value !== null);

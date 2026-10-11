@@ -9,7 +9,7 @@ final class SaveCardData
     private bool $saveCard;
     private ?string $walletId;
 
-    public function __construct(bool $saveCard, ?string $walletId = null)
+    public function __construct(bool $saveCard, #[\SensitiveParameter] ?string $walletId = null)
     {
         if ($walletId !== null && trim($walletId) === '') {
             throw new InvalidArgumentException('walletId must be a non-empty string when provided.');
@@ -25,7 +25,7 @@ final class SaveCardData
      *
      * @param array<string, mixed> $data
      */
-    public static function fromArray(array $data): self
+    public static function fromArray(#[\SensitiveParameter] array $data): self
     {
         if (!array_key_exists('saveCard', $data) || !is_bool($data['saveCard'])) {
             throw new InvalidArgumentException('saveCardData.saveCard is required and must be boolean.');

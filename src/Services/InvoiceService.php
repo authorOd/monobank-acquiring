@@ -123,7 +123,7 @@ class InvoiceService extends AbstractService
      *
      * @return array<string, mixed>
      */
-    public function getReceipt(string $invoiceId, ?string $email = null): array
+    public function getReceipt(string $invoiceId, #[\SensitiveParameter] ?string $email = null): array
     {
         InputValidator::nonEmptyString($invoiceId, 'invoiceId');
 

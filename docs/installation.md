@@ -3,7 +3,7 @@
 ## Install
 
 ```bash
-composer require vladchornyi/mono:^2.0
+composer require vladchornyi/mono:^2.1
 ```
 
 ## Create a Client
@@ -32,6 +32,11 @@ $mono = new MonoClient(
 );
 ```
 
+`baseUrl` must use HTTPS because every request carries the merchant token in
+`X-Token`. Plain `http://` is accepted only for loopback hosts (`localhost`,
+`127.0.0.0/8`, `[::1]`), for example a local test server or a sidecar proxy that
+terminates TLS on the same machine.
+
 The `cms_name` and `cms_version` keys (see `MonoClient::OPTION_CMS_NAME` and
 `OPTION_CMS_VERSION`) are not transport options; they are sent as the optional
 `X-Cms` and `X-Cms-Version` headers for CMS payment modules.
@@ -54,8 +59,13 @@ use Vladchornyi\Mono\Http\HttpResponse;
 
 final class CustomHttpClient implements HttpClientInterface
 {
-    public function send(string $method, string $url, array $headers = [], ?array $body = null): HttpResponse
-    {
+    // Repeat #[\SensitiveParameter]: PHP does not inherit it from the interface.
+    public function send(
+        string $method,
+        #[\SensitiveParameter] string $url,
+        #[\SensitiveParameter] array $headers = [],
+        #[\SensitiveParameter] ?array $body = null
+    ): HttpResponse {
         // Send the request through your application HTTP stack.
         return new HttpResponse(200, '{}');
     }

@@ -210,6 +210,46 @@ final class OutboxWorkerTest extends TestCase
         self::assertSame(['slow-failure', 'independent', 'slow-failure'], $attempts);
     }
 
+    public function testCompletedJobKeepsOnlyARedactedPayload(): void
+    {
+        $this->queue('evt-wallet', 'invoice:p2_wallet', 'invoice.wallet.created', json_encode([
+            'invoiceId' => 'p2_wallet',
+            'walletData' => ['walletId' => 'customer-42', 'cardToken' => 'tok-secret', 'status' => 'created'],
+        ], JSON_THROW_ON_ERROR));
+        $received = [];
+
+        $completed = $this->worker(static function (array $job) use (&$received): void {
+            $received = $job['payload'];
+        })->runOnce();
+
+        self::assertSame(1, $completed);
+        self::assertSame('tok-secret', $received['walletData']['cardToken'], 'the dispatcher sees the real data');
+
+        $statement = $this->connect()->prepare('SELECT payload FROM webhook_outbox WHERE idempotency_key = :key');
+        $statement->execute([':key' => 'evt-wallet']);
+        $stored = json_decode((string) $statement->fetchColumn(), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertSame('p2_wallet', $stored['invoiceId']);
+        self::assertSame('created', $stored['walletData']['status']);
+        self::assertSame('[redacted]', $stored['walletData']['cardToken']);
+        self::assertSame('[redacted]', $stored['walletData']['walletId']);
+    }
+
+    public function testFailedJobKeepsItsPayloadForTheRetry(): void
+    {
+        $payload = json_encode(['walletData' => ['cardToken' => 'tok-retry']], JSON_THROW_ON_ERROR);
+        $this->queue('evt-retry', 'invoice:p2_retry', 'invoice.wallet.created', $payload);
+
+        $this->worker(static function (): void {
+            throw new \RuntimeException('temporary');
+        })->runOnce();
+
+        $statement = $this->connect()->prepare('SELECT payload FROM webhook_outbox WHERE idempotency_key = :key');
+        $statement->execute([':key' => 'evt-retry']);
+
+        self::assertSame($payload, $statement->fetchColumn());
+    }
+
     public function testProcessorCommitsFreshEventsAndRollsBackFailuresOnTheSelectedDatabase(): void
     {
         if (!extension_loaded('openssl')) {
@@ -266,12 +306,12 @@ final class OutboxWorkerTest extends TestCase
         return new OutboxWorker($this->connect(), $dispatcher, $leaseSeconds, 10, fn (): int => $this->now);
     }
 
-    private function queue(string $key, string $entity, string $type): void
+    private function queue(string $key, string $entity, string $type, string $payload = '{}'): void
     {
         $this->connect()->prepare(
             'INSERT INTO webhook_outbox (idempotency_key, entity_key, job_type, payload, created_at) '
             . 'VALUES (:key, :entity, :type, :payload, :now)'
-        )->execute([':key' => $key, ':entity' => $entity, ':type' => $type, ':payload' => '{}', ':now' => 'now']);
+        )->execute([':key' => $key, ':entity' => $entity, ':type' => $type, ':payload' => $payload, ':now' => 'now']);
     }
 
     private function undone(): int

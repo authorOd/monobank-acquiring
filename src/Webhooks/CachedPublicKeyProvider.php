@@ -6,6 +6,7 @@ use InvalidArgumentException;
 use Vladchornyi\Mono\Contracts\PublicKeyCacheInterface;
 use Vladchornyi\Mono\Contracts\PublicKeyProviderInterface;
 use Vladchornyi\Mono\Exceptions\MonoException;
+use Vladchornyi\Mono\Exceptions\MonoPublicKeyUnavailableException;
 use Vladchornyi\Mono\Exceptions\MonoWebhookException;
 use Vladchornyi\Mono\Services\PubkeyService;
 
@@ -19,7 +20,7 @@ final class CachedPublicKeyProvider implements PublicKeyProviderInterface
     private const MINIMUM_REFRESH_LOCK_TTL = 120;
     private const DEFAULT_REFRESH_LOCK_TTL = self::MINIMUM_REFRESH_LOCK_TTL;
 
-    /** @var array<string, array{expiresAt: float, owner: string, shared: bool}> */
+    /** @var array<string, array{expiresAt: float, owner: string}> */
     private static array $processGuards = [];
 
     private PubkeyService $pubkeyService;
@@ -125,7 +126,13 @@ final class CachedPublicKeyProvider implements PublicKeyProviderInterface
         }
 
         if ($lock === false) {
-            return $this->cachedKeyOrThrow($record, $now);
+            return $this->staleKeyOrThrow(
+                $record,
+                $now,
+                new MonoPublicKeyUnavailableException(
+                    'The shared public-key cache is unavailable and no cached key is available.'
+                )
+            );
         }
 
         try {
@@ -163,10 +170,18 @@ final class CachedPublicKeyProvider implements PublicKeyProviderInterface
         $key = $response['key'] ?? null;
 
         if (!is_string($key) || $key === '') {
-            throw new MonoWebhookException('Monobank public key response does not contain a key.');
+            throw new MonoPublicKeyUnavailableException('Monobank public key response does not contain a key.');
         }
 
-        $this->verifier->assertPublicKey($key);
+        try {
+            $this->verifier->assertPublicKey($key);
+        } catch (MonoWebhookException $exception) {
+            throw new MonoPublicKeyUnavailableException(
+                'Monobank returned an unusable public key: ' . $exception->getMessage(),
+                0,
+                $exception
+            );
+        }
 
         $cacheRecord = [
             'version' => self::RECORD_VERSION,
@@ -184,7 +199,7 @@ final class CachedPublicKeyProvider implements PublicKeyProviderInterface
                 $this->staleTtl
             );
         } catch (\Exception $exception) {
-            throw new MonoWebhookException(
+            throw new MonoPublicKeyUnavailableException(
                 'Public-key refresh ownership could not be confirmed.',
                 0,
                 $exception
@@ -196,7 +211,7 @@ final class CachedPublicKeyProvider implements PublicKeyProviderInterface
             return $this->staleKeyOrThrow(
                 $winner,
                 time(),
-                new MonoWebhookException(
+                new MonoPublicKeyUnavailableException(
                     'Public-key refresh lease expired before publication and no validated key is available.'
                 )
             );
@@ -265,9 +280,13 @@ final class CachedPublicKeyProvider implements PublicKeyProviderInterface
     }
 
     /**
-     * Returns an owner token when the shared cache guard was acquired, false when only
-     * the process-local fallback was acquired, and null when another worker
-     * already owns the guard.
+     * Returns an owner token when the shared cache guard was acquired, false when the
+     * shared cache is unavailable, and null when another worker or another call in
+     * this process already owns the guard.
+     *
+     * A cache outage registers no process-local guard: the caller never fetches
+     * without the shared guard, so a local guard would only make later calls in
+     * this process wait for a refresh that cannot happen.
      */
     private function acquireGuard(string $suffix, int $ttl): string|false|null
     {
@@ -283,21 +302,19 @@ final class CachedPublicKeyProvider implements PublicKeyProviderInterface
             $owner = bin2hex(random_bytes(16));
             $shared = $this->cache->add($guardKey, $owner, $ttl);
         } catch (\Exception $exception) {
-            $owner = hash('sha256', $guardKey . "\0" . $now . "\0" . spl_object_id($this));
-            $shared = null;
+            return false;
         }
 
-        if ($shared === false) {
+        if (!$shared) {
             return null;
         }
 
         self::$processGuards[$guardKey] = [
             'expiresAt' => $now + $ttl,
             'owner' => $owner,
-            'shared' => $shared === true,
         ];
 
-        return $shared === true ? $owner : false;
+        return $owner;
     }
 
     private function releaseGuard(string $suffix, string $owner): void
@@ -350,11 +367,13 @@ final class CachedPublicKeyProvider implements PublicKeyProviderInterface
             return $this->staleKeyOrThrow(
                 $record,
                 $now,
-                new MonoWebhookException('Public-key refresh is still in progress.')
+                new MonoPublicKeyUnavailableException('Public-key refresh is still in progress.')
             );
         }
 
-        throw new MonoWebhookException('Public-key refresh is still in progress and no refreshed key is available.');
+        throw new MonoPublicKeyUnavailableException(
+            'Public-key refresh is still in progress and no refreshed key is available.'
+        );
     }
 
     private function guardExists(string $suffix): bool
@@ -364,7 +383,7 @@ final class CachedPublicKeyProvider implements PublicKeyProviderInterface
         $this->discardExpiredProcessGuard($guardKey, $now);
 
         if (isset(self::$processGuards[$guardKey])) {
-            return self::$processGuards[$guardKey]['shared'];
+            return true;
         }
 
         try {
@@ -397,7 +416,7 @@ final class CachedPublicKeyProvider implements PublicKeyProviderInterface
         return $this->staleKeyOrThrow(
             $record,
             $now,
-            new MonoWebhookException('Public-key refresh is rate limited and no cached key is available.')
+            new MonoPublicKeyUnavailableException('Public-key refresh is rate limited and no cached key is available.')
         );
     }
 
