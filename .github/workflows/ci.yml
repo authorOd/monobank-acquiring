@@ -22,7 +22,7 @@ jobs:
           php-version: ${{ matrix.php }}
           extensions: curl, json, mbstring, openssl, pdo_sqlite
           coverage: none
-      - uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # v3 (3.2.1)
+      - uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # v4.0.0
       - run: composer validate --strict
       - run: composer test:ci
       - run: composer test:release
@@ -70,7 +70,7 @@ jobs:
           php-version: '8.4'
           extensions: json, mbstring, openssl, pdo_mysql, pdo_pgsql
           coverage: none
-      - uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # v3 (3.2.1)
+      - uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # v4.0.0
       - run: php vendor/bin/phpunit --fail-on-skipped tests/Integration/OutboxWorkerTest.php
         env:
           MONO_WEBHOOK_TEST_DSN: '${{ matrix.driver }}:host=127.0.0.1;port=${{ matrix.port }};dbname=mono_test'
@@ -86,7 +86,7 @@ jobs:
           php-version: '8.4'
           extensions: json, mbstring, openssl, pdo_sqlite
           coverage: none
-      - uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # v3 (3.2.1)
+      - uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # v4.0.0
       - run: php vendor/bin/phpunit --fail-on-skipped tests/Integration/ComposerConsumerTest.php
 
   quality:
@@ -98,7 +98,7 @@ jobs:
           php-version: '8.4'
           extensions: curl, json, mbstring, openssl, pdo_sqlite
           coverage: none
-      - uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # v3 (3.2.1)
+      - uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # v4.0.0
       - run: composer analyse
       - run: composer cs
       - run: composer audit
@@ -124,7 +124,7 @@ jobs:
           php-version: '8.4'
           extensions: json, mbstring, pdo_sqlite, :curl, :openssl
           coverage: none
-      - uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # v3 (3.2.1)
+      - uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # v4.0.0
       - run: composer test
 
   coverage:
@@ -136,7 +136,7 @@ jobs:
           php-version: '8.4'
           extensions: curl, json, mbstring, openssl, pdo_sqlite
           coverage: pcov
-      - uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # v3 (3.2.1)
+      - uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # v4.0.0
       - run: mkdir -p build
       - run: composer test:coverage
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
